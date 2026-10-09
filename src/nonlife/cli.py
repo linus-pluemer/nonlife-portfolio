@@ -17,12 +17,16 @@ import numpy as np
 from scipy import stats
 
 from nonlife import collective, plots
-from nonlife.data import load_portfolio, save_portfolio
-from nonlife.simulate import simulate_claims, simulate_policies
+from nonlife.data import save_portfolio
+from nonlife.simulate import Portfolio, default_parameters, simulate_portfolio
+
+VALUATION_YEAR = 2024
 
 
-def _run_collective(data_dir: Path, figures_dir: Path, n_sim: int, seed: int) -> dict[str, Any]:
-    policies, claims = load_portfolio(data_dir)
+def _run_collective(
+    portfolio: Portfolio, figures_dir: Path, n_sim: int, seed: int
+) -> dict[str, Any]:
+    policies, claims = portfolio.policies, portfolio.claims
     lambda_ = collective.estimate_frequency_parameter(claims, policies)
     mu, sigma = collective.estimate_severity_parameters(claims)
     severity = stats.lognorm(s=sigma, scale=float(np.exp(mu)))
@@ -49,14 +53,11 @@ def _run_collective(data_dir: Path, figures_dir: Path, n_sim: int, seed: int) ->
     }
 
 
-def _run_reserving(data_dir: Path, figures_dir: Path) -> dict[str, Any]:
-    _, claims = load_portfolio(data_dir)
-    if not {"accident_year", "development_year"} <= set(claims.columns):
-        raise NotImplementedError("Simulation liefert noch kein Anfall- und Abwicklungsjahr")
-    raise NotImplementedError
+def _run_reserving(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
+    raise NotImplementedError("Dreieck noch nicht auf payments umgestellt")
 
 
-def _run_pricing(data_dir: Path, figures_dir: Path) -> dict[str, Any]:
+def _run_pricing(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
     raise NotImplementedError
 
 
@@ -73,16 +74,23 @@ def run(args: argparse.Namespace) -> None:
     data_dir: Path = args.data_dir
     figures_dir: Path = args.figures_dir
 
-    policies = simulate_policies(n_policies=args.n_policies, seed=args.seed)
-    claims = simulate_claims(policies, seed=args.seed)
-    save_portfolio(policies, claims, data_dir)
-    print(f"{len(policies)} Policen, {len(claims)} Schäden -> {data_dir}")
+    years = range(VALUATION_YEAR - args.n_years + 1, VALUATION_YEAR + 1)
+    portfolio = simulate_portfolio(
+        default_parameters(), args.n_policies, years, np.random.default_rng(args.seed)
+    )
+    save_portfolio(portfolio, data_dir)
+    print(
+        f"{len(portfolio.policies)} Policen, {len(portfolio.claims)} Schäden, "
+        f"{len(portfolio.payments)} Zahlungen, Anfalljahre {years[0]}-{years[-1]} -> {data_dir}"
+    )
 
-    results: dict[str, Any] = {"seed": args.seed, "n_policies": args.n_policies}
+    results: dict[str, Any] = {
+        "seed": args.seed, "n_policies_per_year": args.n_policies, "accident_years": list(years),
+    }
     _step("collective",
-          lambda: _run_collective(data_dir, figures_dir, args.n_sim, args.seed), results)
-    _step("reserving", lambda: _run_reserving(data_dir, figures_dir), results)
-    _step("pricing", lambda: _run_pricing(data_dir, figures_dir), results)
+          lambda: _run_collective(portfolio, figures_dir, args.n_sim, args.seed), results)
+    _step("reserving", lambda: _run_reserving(portfolio, figures_dir), results)
+    _step("pricing", lambda: _run_pricing(portfolio, figures_dir), results)
 
     out = figures_dir.parent / "results.json"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -96,7 +104,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     p_run = sub.add_parser("run", help="Daten, Kennzahlen und Grafiken neu erzeugen")
     p_run.add_argument("--seed", type=int, default=42)
-    p_run.add_argument("--n-policies", type=int, default=5000)
+    p_run.add_argument("--n-policies", type=int, default=10_000, help="Policen je Anfalljahr")
+    p_run.add_argument("--n-years", type=int, default=10, help=f"Anfalljahre bis {VALUATION_YEAR}")
     p_run.add_argument("--n-sim", type=int, default=10_000, help="Monte-Carlo-Läufe")
     p_run.add_argument("--data-dir", type=Path, default=Path("data"))
     p_run.add_argument("--figures-dir", type=Path, default=Path("reports/figures"))
