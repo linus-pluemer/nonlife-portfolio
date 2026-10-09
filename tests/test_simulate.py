@@ -1,11 +1,12 @@
 """Tests für nonlife.simulate.
 
-Der erste Block prüft die bisherige Simulation. Der zweite Block beschreibt
-die neue Schnittstelle (``simulate_portfolio``) und läuft als xfail, bis sie
-implementiert ist.
+Geprüft wird gegen die wahren Parameter der Simulation. Toleranzen sind
+4 Standardfehler (Normalapproximation), bei festem Seed also deterministisch.
 """
 
 from __future__ import annotations
+
+import dataclasses
 
 import numpy as np
 import pandas as pd
@@ -15,57 +16,8 @@ from nonlife.simulate import (
     Portfolio,
     TrueParameters,
     default_parameters,
-    simulate_claims,
-    simulate_policies,
     simulate_portfolio,
 )
-from tests.conftest import not_implemented
-
-# --- bisherige Simulation ----------------------------------------------------
-
-
-def test_simulate_policies_shape() -> None:
-    policies = simulate_policies(n_policies=200, seed=1)
-    assert len(policies) == 200
-    assert set(policies.columns) == {
-        "policy_id",
-        "exposure",
-        "fahrer_alter",
-        "ps_klasse",
-        "region",
-        "erwartete_frequenz",
-    }
-
-
-def test_exposure_range() -> None:
-    policies = simulate_policies(n_policies=500, seed=1)
-    assert policies["exposure"].between(0, 1).all()
-
-
-def test_erwartete_frequenz_positiv() -> None:
-    policies = simulate_policies(n_policies=500, seed=1)
-    assert (policies["erwartete_frequenz"] > 0).all()
-
-
-def test_claims_referenzieren_gueltige_policen() -> None:
-    policies = simulate_policies(n_policies=500, seed=1)
-    claims = simulate_claims(policies, seed=1)
-    assert claims["policy_id"].isin(policies["policy_id"]).all()
-
-
-def test_claim_amounts_positiv() -> None:
-    policies = simulate_policies(n_policies=500, seed=1)
-    claims = simulate_claims(policies, seed=1)
-    assert (claims["claim_amount"] > 0).all()
-
-
-def test_reproduzierbarkeit_mit_seed() -> None:
-    p1 = simulate_policies(n_policies=100, seed=7)
-    p2 = simulate_policies(n_policies=100, seed=7)
-    assert p1.equals(p2)
-
-
-# --- neue Schnittstelle ------------------------------------------------------
 
 YEARS = range(2015, 2025)
 
@@ -78,7 +30,6 @@ def portfolio() -> Portfolio:
     )
 
 
-@not_implemented
 def test_parameters_are_consistent() -> None:
     params = default_parameters()
     assert isinstance(params, TrueParameters)
@@ -89,7 +40,6 @@ def test_parameters_are_consistent() -> None:
     assert params.frequency_factors.keys() == params.severity_factors.keys()
 
 
-@not_implemented
 def test_reproducible_with_same_generator_seed() -> None:
     def run(seed: int) -> Portfolio:
         return simulate_portfolio(
@@ -102,7 +52,6 @@ def test_reproducible_with_same_generator_seed() -> None:
     assert not a.claims.equals(run(6).claims)
 
 
-@not_implemented
 def test_payments_respect_valuation_date(portfolio: Portfolio) -> None:
     p = portfolio.payments
     assert portfolio.valuation_year == max(YEARS)
@@ -110,14 +59,12 @@ def test_payments_respect_valuation_date(portfolio: Portfolio) -> None:
     assert (p["accident_year"] + p["development_year"] <= portfolio.valuation_year).all()
 
 
-@not_implemented
 def test_payments_never_exceed_claim(portfolio: Portfolio) -> None:
     paid = portfolio.payments.groupby("claim_id")["amount"].sum()
     amount = portfolio.claims.set_index("claim_id")["claim_amount"]
     assert (paid <= amount.loc[paid.index] * (1 + 1e-12)).all()
 
 
-@not_implemented
 def test_oldest_year_almost_fully_paid(portfolio: Portfolio) -> None:
     # Mit 10 Abwicklungsjahren ist das älteste Anfalljahr bis auf den Rest des
     # Musters jenseits von Jahr 9 bezahlt.
@@ -129,13 +76,11 @@ def test_oldest_year_almost_fully_paid(portfolio: Portfolio) -> None:
     assert paid / ultimate == pytest.approx(1 - outstanding_share, abs=0.02)
 
 
-@not_implemented
 def test_true_ultimate_is_sum_of_claims(portfolio: Portfolio) -> None:
     expected = portfolio.claims.groupby("accident_year")["claim_amount"].sum()
     pd.testing.assert_series_equal(portfolio.true_ultimate(), expected, check_names=False)
 
 
-@not_implemented
 def test_frequency_per_level_matches_true_factor(portfolio: Portfolio) -> None:
     # Je Ausprägung ℓ von Merkmal m ist N_ℓ Poisson-verteilt mit Erwartung
     # Σ_i λ(x_i)·e_i. Prüfung: |N_ℓ - E| < 4·√E (Normalapproximation).
@@ -157,7 +102,6 @@ def test_frequency_per_level_matches_true_factor(portfolio: Portfolio) -> None:
         assert (np.abs(agg["n"] - agg["lam"]) < 4 * np.sqrt(agg["lam"])).all(), feature
 
 
-@not_implemented
 def test_severity_mean_matches_true_parameters(portfolio: Portfolio) -> None:
     # Mittel von n Schäden: Standardfehler ≈ CV·E[X]/√n.
     params = portfolio.params
@@ -168,3 +112,62 @@ def test_severity_mean_matches_true_parameters(portfolio: Portfolio) -> None:
     ratio = claims["claim_amount"].to_numpy() / mean
     se = params.severity_cv / np.sqrt(len(claims))
     assert abs(ratio.mean() - 1.0) < 4 * se
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"development_pattern": (0.5, 0.4)},
+        {"development_pattern": (1.1, -0.1)},
+        {"severity_cv": 0.0},
+        {"full_year_share": 1.5},
+        {"severity_factors": {**default_parameters().severity_factors, "region": {"urban": 1.2}}},
+    ],
+)
+def test_invalid_parameters_are_rejected(change: dict[str, object]) -> None:
+    with pytest.raises(ValueError):
+        dataclasses.replace(default_parameters(), **change)
+
+
+def test_exposure_in_unit_interval(portfolio: Portfolio) -> None:
+    exposure = portfolio.policies["exposure"]
+    assert ((exposure > 0) & (exposure <= 1)).all()
+    share_full = (exposure == 1).mean()
+    se = np.sqrt(0.7 * 0.3 / len(exposure))
+    assert abs(share_full - portfolio.params.full_year_share) < 4 * se
+
+
+def test_conditional_feature_distribution(portfolio: Portfolio) -> None:
+    # Anteil "high" je Altersklasse gegen die bedingte Wahrscheinlichkeit.
+    conditional = portfolio.params.conditional_features["vehicle_power"]
+    pol = portfolio.policies
+    for age, probabilities in conditional.probabilities.items():
+        is_high = pol.loc[pol["driver_age"] == age, "vehicle_power"] == "high"
+        p = probabilities["high"]
+        assert abs(is_high.mean() - p) < 4 * np.sqrt(p * (1 - p) / len(is_high)), age
+
+
+def test_fully_developed_claims_are_fully_paid(portfolio: Portfolio) -> None:
+    last_year = portfolio.valuation_year - len(portfolio.params.development_pattern) + 1
+    claims = portfolio.claims[portfolio.claims["accident_year"] <= last_year]
+    paid = portfolio.payments.groupby("claim_id")["amount"].sum().loc[claims["claim_id"]]
+    np.testing.assert_allclose(paid.to_numpy(), claims["claim_amount"].to_numpy(), rtol=1e-12)
+
+
+def test_payment_shares_follow_pattern(portfolio: Portfolio) -> None:
+    # Dirichlet(κp): E[Anteil_j] = p_j, Var[Anteil_j] = p_j(1 - p_j)/(κ + 1).
+    params = portfolio.params
+    oldest = portfolio.claims[portfolio.claims["accident_year"] == min(YEARS)]
+    payments = portfolio.payments.merge(oldest[["claim_id", "claim_amount"]], on="claim_id")
+    share = (payments["amount"] / payments["claim_amount"]).groupby(payments["development_year"])
+    pattern = np.asarray(params.development_pattern)
+    se = np.sqrt(pattern * (1 - pattern) / (params.development_concentration + 1) / len(oldest))
+    assert (np.abs(share.mean().to_numpy() - pattern) < 4 * se).all()
+
+
+def test_true_reserve_is_ultimate_minus_paid(portfolio: Portfolio) -> None:
+    reserve = portfolio.true_reserve()
+    paid = portfolio.payments.groupby("accident_year")["amount"].sum()
+    np.testing.assert_allclose((reserve + paid).to_numpy(), portfolio.true_ultimate().to_numpy())
+    assert reserve.iloc[0] == pytest.approx(0.0, abs=1e-6 * portfolio.true_ultimate().iloc[0])
+    assert reserve.is_monotonic_increasing
