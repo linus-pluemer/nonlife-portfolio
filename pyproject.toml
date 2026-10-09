@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nonlife"
+version = "0.1.0"
+description = "Schadenmodellierung für ein Kfz-Portfolio: kollektives Modell, Chain-Ladder, GLM-Tarifierung"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Linus Plümer" }]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    "statsmodels>=0.14",
+    "scikit-learn>=1.4",  # nur für fetch_openml (freMTPL2)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "chainladder>=0.8",  # nur als Gegenprobe in Tests
+]
+
+[project.scripts]
+nonlife = "nonlife.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = ["ignore::DeprecationWarning:chainladder.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "NPY", "PD", "RUF"]
+ignore = [
+    "RUF001",  # griechische Buchstaben in Docstrings sind gewollt
+    "RUF002",
+    "RUF003",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["pandas.*", "scipy.*", "statsmodels.*", "sklearn.*", "matplotlib.*", "chainladder.*"]
+ignore_missing_imports = true

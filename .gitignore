@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+.DS_Store
+
+# erzeugte oder heruntergeladene Daten
+data/*
+!data/.gitkeep
+.mypy_cache/
+.ruff_cache/
+
+# lokale Arbeitsanweisungen für Claude Code
+CLAUDE.md
