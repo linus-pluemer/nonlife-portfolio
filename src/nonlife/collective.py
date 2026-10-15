@@ -36,8 +36,8 @@ def estimate_frequency_parameter(claims: pd.DataFrame, policies: pd.DataFrame) -
     float
         Geschaetzter λ-Parameter
     """
-    return len(claims) / policies["exposure"].sum()
-    
+    return float(len(claims) / policies["exposure"].sum())
+
 
 
 def estimate_severity_parameters(claims: pd.DataFrame) -> tuple[float, float]:
@@ -58,7 +58,7 @@ def estimate_severity_parameters(claims: pd.DataFrame) -> tuple[float, float]:
         Hinweis: scipy.stats.lognorm.fit() gibt (s, loc, scale) zurueck,
         wobei s=σ und scale=e^μ.
     """
-    sigma, loc, scale = stats.lognorm.fit(claims["claim_amount"])
+    sigma, _loc, scale = stats.lognorm.fit(claims["claim_amount"])
     mu =  np.log(scale)
     return mu, sigma
 
@@ -125,7 +125,7 @@ def calculate_statistics(simulations: np.ndarray) -> dict[str, float]:
         - "std": Standardabweichung σ[S]
         - "quantile_99": 99%-Quantil (Value-at-Risk)
     """
-    
+
     my_dict = {}
     my_dict["mean"] = np.mean(simulations)
     my_dict["variance"] = np.var(simulations, ddof=0)
