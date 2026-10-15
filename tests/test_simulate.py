@@ -81,7 +81,7 @@ def test_true_ultimate_is_sum_of_claims(portfolio: Portfolio) -> None:
     pd.testing.assert_series_equal(portfolio.true_ultimate(), expected, check_names=False)
 
 
-def test_frequency_per_level_matches_true_factor(portfolio: Portfolio) -> None:
+def test_claim_counts_per_level_match_expectation(portfolio: Portfolio) -> None:
     # Je Ausprägung ℓ von Merkmal m ist N_ℓ Poisson-verteilt mit Erwartung
     # Σ_i λ(x_i)·e_i. Prüfung: |N_ℓ - E| < 4·√E (Normalapproximation).
     params = portfolio.params
