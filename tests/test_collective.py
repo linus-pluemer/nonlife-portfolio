@@ -37,7 +37,7 @@ def severity() -> stats.rv_continuous:
 
 @pytest.fixture(scope="module")
 def simulations() -> np.ndarray:
-    return monte_carlo_simulation(LAMBDA, MU, SIGMA, num_simulations=N_SIM, random_seed=1)
+    return monte_carlo_simulation(LAMBDA, MU, SIGMA, N_SIM, np.random.default_rng(1))
 
 
 # --- Schätzung ---------------------------------------------------------------
@@ -66,13 +66,23 @@ def test_simulation_shape_and_sign(simulations: np.ndarray) -> None:
 
 
 def test_simulation_is_reproducible() -> None:
-    a = monte_carlo_simulation(LAMBDA, MU, SIGMA, num_simulations=100, random_seed=7)
-    b = monte_carlo_simulation(LAMBDA, MU, SIGMA, num_simulations=100, random_seed=7)
+    a = monte_carlo_simulation(LAMBDA, MU, SIGMA, 100, np.random.default_rng(7))
+    b = monte_carlo_simulation(LAMBDA, MU, SIGMA, 100, np.random.default_rng(7))
     np.testing.assert_array_equal(a, b)
 
 
-def test_zero_frequency_gives_zero_loss() -> None:
-    assert (monte_carlo_simulation(0.0, MU, SIGMA, num_simulations=100) == 0).all()
+def test_zero_frequency_gives_zero_loss(rng: np.random.Generator) -> None:
+    assert (monte_carlo_simulation(0.0, MU, SIGMA, 100, rng) == 0).all()
+
+
+def test_probability_of_no_claim(rng: np.random.Generator) -> None:
+    # P(S = 0) = P(N = 0) = e^{-λ}, da X > 0 fast sicher. Prüft, dass Läufe
+    # ohne Schaden als 0 erscheinen (minlength in bincount). Toleranz:
+    # 4 Standardfehler des Binomialanteils.
+    lam, n = 2.0, 20_000
+    p = np.exp(-lam)
+    share = (monte_carlo_simulation(lam, MU, SIGMA, n, rng) == 0).mean()
+    assert abs(share - p) < 4 * np.sqrt(p * (1 - p) / n)
 
 
 def test_simulated_mean_matches_wald(

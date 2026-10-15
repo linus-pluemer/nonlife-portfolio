@@ -27,26 +27,33 @@ def _run_collective(
     portfolio: Portfolio, figures_dir: Path, n_sim: int, seed: int
 ) -> dict[str, Any]:
     policies, claims = portfolio.policies, portfolio.claims
-    lambda_ = collective.estimate_frequency_parameter(claims, policies)
+    # S ist die Jahresschadenlast des Portfolios: Frequenz je Exposure-Jahr
+    # mal mittlere Exposure eines Anfalljahres.
+    frequency = collective.estimate_frequency_parameter(claims, policies)
+    exposure_per_year = policies.groupby("accident_year")["exposure"].sum().mean()
+    lambda_ = float(frequency * exposure_per_year)
     mu, sigma = collective.estimate_severity_parameters(claims)
     severity = stats.lognorm(s=sigma, scale=float(np.exp(mu)))
 
     simulations = collective.monte_carlo_simulation(
-        lambda_, mu, sigma, num_simulations=n_sim, random_seed=seed
+        lambda_, mu, sigma, n_sim, np.random.default_rng(seed)
     )
     sim = collective.calculate_statistics(simulations)
     theory = collective.theoretical_statistics(lambda_, severity.mean(), severity.var())
 
-    print(f"  λ = {lambda_:.6f}, μ = {mu:.4f}, σ = {sigma:.4f}")
-    print(f"  {'':<10}{'Simulation':>16}{'Theorie':>16}")
+    print(f"  Frequenz je Exposure-Jahr = {frequency:.4f}, "
+          f"Exposure je Jahr = {exposure_per_year:,.0f}")
+    print(f"  λ = {lambda_:.1f}, μ = {mu:.4f}, σ = {sigma:.4f}")
+    print(f"  {'':<10}{'Simulation':>20}{'Theorie':>20}")
     for key in ("mean", "variance", "std"):
-        print(f"  {key:<10}{sim[key]:>16,.2f}{theory[key]:>16,.2f}")
+        print(f"  {key:<10}{sim[key]:>20,.2f}{theory[key]:>20,.2f}")
     print(f"  99-%-Quantil (Simulation): {sim['quantile_99']:,.2f}")
 
     fig = plots.plot_aggregate_distribution(simulations, theory, sim["quantile_99"])
     path = plots.save(fig, figures_dir / "aggregate_loss.png")
     print(f"  Grafik: {path}")
     return {
+        "frequency": frequency, "exposure_per_year": float(exposure_per_year),
         "lambda": lambda_, "mu": mu, "sigma": sigma,
         "simulation": {k: float(v) for k, v in sim.items()},
         "theory": {k: float(v) for k, v in theory.items()},

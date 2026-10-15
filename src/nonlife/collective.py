@@ -67,45 +67,38 @@ def monte_carlo_simulation(
     lambda_: float,
     mu: float,
     sigma: float,
-    num_simulations: int = 10000,
-    random_seed: int = 42,
+    n_sim: int,
+    rng: np.random.Generator,
 ) -> np.ndarray:
-    """Fuehrt eine Monte-Carlo-Simulation des Gesamtschadens durch.
+    """Simuliert n_sim Realisierungen von S = X_1 + ... + X_N, vektorisiert.
 
-    Fuer jede Simulation:
-      1. Ziehe N ~ Poisson(λ)
-      2. Ziehe N Schaeden X_i ~ Lognormal(μ, σ)
-      3. Berechne S = sum(X_i)
+    Alle Schadenanzahlen N_k werden in einem Aufruf gezogen, danach alle
+    Σ N_k Schadenhöhen auf einmal. ``np.bincount`` summiert die Schäden je
+    Lauf k; ``minlength`` gibt Läufen ohne Schaden den Wert 0.
+
+    Speicherbedarf O(n_sim · λ): bei λ ≈ 720 und 10 000 Läufen etwa 58 MB.
+    Für deutlich mehr Läufe müsste in Blöcken simuliert werden.
 
     Parameters
     ----------
-    lambda_ : float
-        Poisson-Parameter (Frequenz)
-    mu : float
-        Lognormal-Parameter μ (log-location)
-    sigma : float
-        Lognormal-Parameter σ (log-scale)
-    num_simulations : int
-        Anzahl der Simulationen (default: 10000)
-    random_seed : int
-        Seed fuer Reproduzierbarkeit (default: 42)
+    lambda_
+        Poisson-Parameter, E[N] = λ
+    mu, sigma
+        Parameter der Lognormalverteilung, also von ln X ~ N(μ, σ²)
+    n_sim
+        Anzahl Simulationsläufe
+    rng
+        einzige Zufallsquelle
 
     Returns
     -------
-    np.ndarray
-        Array mit num_simulations Gesamtschaeden S_1, S_2, ..., S_n
+    Array der Länge n_sim mit den simulierten Gesamtschäden.
     """
-    np.random.seed(random_seed)
-    total_losses = []
-    for i in range(num_simulations):
-        N = np.random.poisson(lambda_)
-        if N > 0:
-            X = np.random.lognormal(mu, sigma, size=N)
-            S = X.sum()
-        else:
-            S = 0
-        total_losses.append(S)
-    return np.array(total_losses)
+    n_claims = rng.poisson(lambda_, size=n_sim)
+    amounts = rng.lognormal(mu, sigma, size=n_claims.sum())
+    run = np.repeat(np.arange(n_sim), n_claims)
+    total: np.ndarray = np.bincount(run, weights=amounts, minlength=n_sim)
+    return total
 
 
 def calculate_statistics(simulations: np.ndarray) -> dict[str, float]:
