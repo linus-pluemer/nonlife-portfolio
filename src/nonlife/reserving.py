@@ -12,6 +12,8 @@ Reserve ist C_{i,J} - C_{i,I-i}.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -98,7 +100,9 @@ def project_triangle(triangle: pd.DataFrame, factors: np.ndarray) -> pd.DataFram
     return projected
 
 
-def calculate_reserve(original_triangle: pd.DataFrame, projected_triangle: pd.DataFrame) -> dict:
+def calculate_reserve(
+    original_triangle: pd.DataFrame, projected_triangle: pd.DataFrame
+) -> dict[str, Any]:
     """Berechnet die Reserve (IBNR) pro Anfalljahr und insgesamt.
 
     Reserve fuer ein Anfalljahr = projizierter Gesamtschaden - beobachteter Gesamtschaden
