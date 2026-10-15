@@ -9,14 +9,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from scipy import stats
 
-from nonlife import collective, plots
+from nonlife import collective, plots, pricing
 from nonlife.data import save_portfolio
 from nonlife.simulate import Portfolio, default_parameters, simulate_portfolio
 
@@ -64,8 +64,68 @@ def _run_reserving(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
     raise NotImplementedError("Dreieck noch nicht auf payments umgestellt")
 
 
+def _true_table(factors: Mapping[str, Mapping[str, float]]) -> tuple[
+    dict[tuple[str, str], float], dict[str, str]
+]:
+    """Wahre Faktoren als (feature, level) -> Faktor und Referenz = Ausprägung mit Faktor 1."""
+    true = {(f, lvl): v for f, by_level in factors.items() for lvl, v in by_level.items()}
+    reference = {f: next(lvl for lvl, v in by_level.items() if v == 1.0)
+                 for f, by_level in factors.items()}
+    return true, reference
+
+
+def _print_relativities(rel: Any, true: Mapping[tuple[str, str], float]) -> None:
+    print(f"  {'':<24}{'GLM':>8}{'95-%-KI':>18}{'wahr':>8}")
+    for (feature, level), row in rel.iterrows():
+        ci = f"[{row['lower']:.3f}, {row['upper']:.3f}]"
+        print(f"  {feature + ': ' + str(level):<24}{row['factor']:>8.3f}{ci:>18}"
+              f"{true[(feature, level)]:>8.3f}")
+
+
 def _run_pricing(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
-    raise NotImplementedError
+    params, policies, claims = portfolio.params, portfolio.policies, portfolio.claims
+    results: dict[str, Any] = {}
+
+    # Frequenz, mit einfacher Auswertung je Merkmal als Vergleich
+    true, reference = _true_table(params.frequency_factors)
+    features = list(params.frequency_factors)
+    model = pricing.fit_frequency_glm(
+        pricing.frequency_table(policies, claims), features, reference
+    )
+    rel = pricing.relativities(model).reindex(list(true))  # Reihenfolge wie in den Parametern
+    one_way = {
+        (f, lvl): float(v)
+        for f in features
+        for lvl, v in pricing.one_way_relativities(policies, claims, f, reference[f]).items()
+    }
+    print("  Frequenz (Poisson-GLM, Offset log Exposure)")
+    _print_relativities(rel, true)
+    path = plots.save(plots.plot_relativities(rel, true, one_way),
+                      figures_dir / "relativities_frequency.png")
+    print(f"  Grafik: {path}")
+    results["frequency"] = [
+        {"feature": f, "level": lvl, **{k: float(v) for k, v in row.items()},
+         "true": true[(f, lvl)], "one_way": one_way[(f, lvl)]}
+        for (f, lvl), row in rel.iterrows()
+    ]
+
+    # Schwere
+    true, reference = _true_table(params.severity_factors)
+    model = pricing.fit_severity_glm(
+        pricing.severity_table(policies, claims), list(params.severity_factors), reference
+    )
+    rel = pricing.relativities(model).reindex(list(true))
+    print("  Schwere (Gamma-GLM, Log-Link)")
+    _print_relativities(rel, true)
+    path = plots.save(plots.plot_relativities(rel, true),
+                      figures_dir / "relativities_severity.png")
+    print(f"  Grafik: {path}")
+    results["severity"] = [
+        {"feature": f, "level": lvl, **{k: float(v) for k, v in row.items()},
+         "true": true[(f, lvl)]}
+        for (f, lvl), row in rel.iterrows()
+    ]
+    return results
 
 
 def _step(name: str, func: Callable[[], dict[str, Any]], results: dict[str, Any]) -> None:

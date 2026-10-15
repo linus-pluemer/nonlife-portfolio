@@ -17,6 +17,7 @@ from matplotlib.figure import Figure
 
 SERIES_1 = "#2a78d6"  # Schätzung / Simulation
 SERIES_2 = "#eb6834"  # Wahrheit / Theorie
+SERIES_3 = "#1baf7a"  # einfache Auswertung (Vergleich)
 TEXT = "#0b0b0b"
 TEXT_MUTED = "#52514e"
 GRID = "#e4e3df"
@@ -89,22 +90,39 @@ def plot_reserves(
     return fig
 
 
-def plot_relativities(rel: pd.DataFrame, true: Mapping[tuple[str, str], float]) -> Figure:
+def plot_relativities(
+    rel: pd.DataFrame,
+    true: Mapping[tuple[str, str], float],
+    one_way: Mapping[tuple[str, str], float] | None = None,
+    confidence: float = 0.95,
+) -> Figure:
     """Geschätzte Tariffaktoren mit Konfidenzintervall gegen die wahren Faktoren.
 
-    ``rel`` im Format von :func:`nonlife.pricing.relativities`.
+    ``rel`` im Format von :func:`nonlife.pricing.relativities`, Reihenfolge
+    der Zeilen = Reihenfolge von oben nach unten. Mit ``one_way`` wird je
+    Ausprägung zusätzlich die einfache Auswertung leicht versetzt gezeigt.
     """
-    fig, ax = _new_figure()
-    y = np.arange(len(rel))[::-1]
+    fig, ax = plt.subplots(figsize=(7.5, 0.32 * len(rel) + 1.7), dpi=150, facecolor=SURFACE)
+    _style(ax)
+    y = np.arange(len(rel))[::-1].astype(float)
+    if one_way is not None:
+        ax.plot([one_way[k] for k in rel.index], y + 0.28, "s", color=SERIES_3, markersize=6,
+                markeredgecolor=SURFACE, label="einfache Auswertung je Merkmal")
     err = np.vstack([rel["factor"] - rel["lower"], rel["upper"] - rel["factor"]])
     ax.errorbar(rel["factor"], y, xerr=err, fmt="o", color=SERIES_1, markersize=6, capsize=3,
-                linewidth=1.5, label="GLM-Schätzung mit KI")
+                linewidth=1.5, label=f"GLM mit {confidence * 100:.0f}-%-Konfidenzintervall")
     ax.plot([true[k] for k in rel.index], y, "D", color=SERIES_2, markersize=6,
-            label="wahrer Faktor")
+            markeredgecolor=SURFACE, label="wahrer Faktor")
     ax.axvline(1.0, color=TEXT_MUTED, linewidth=0.8)
+    features = rel.index.get_level_values(0)
+    for i in range(1, len(rel)):
+        if features[i] != features[i - 1]:
+            ax.axhline(y[i] + 0.5, color=GRID, linewidth=0.8)
     ax.set_yticks(y, [f"{f}: {lvl}" for f, lvl in rel.index])
+    ax.set_ylim(-0.6, len(rel) - 0.4)
     ax.grid(axis="x", color=GRID, linewidth=0.8)
     ax.grid(axis="y", visible=False)
     ax.set_xlabel("Faktor relativ zur Referenzklasse", color=TEXT)
-    ax.legend(frameon=False, fontsize=9, labelcolor=TEXT)
+    ax.legend(frameon=False, fontsize=9, labelcolor=TEXT, loc="lower left",
+              bbox_to_anchor=(0, 1.0), ncol=3, borderaxespad=0.3)
     return fig
