@@ -74,13 +74,17 @@ def plot_aggregate_distribution(
 
 
 def plot_reserves(
-    estimated: pd.Series, se: pd.Series, true: pd.Series, z: float = 1.96
+    estimated: pd.Series, true: pd.Series, se: pd.Series | None = None, z: float = 1.96
 ) -> Figure:
-    """Geschätzte Reserve je Anfalljahr mit ±z·se gegen die wahre Reserve."""
+    """Geschätzte Reserve je Anfalljahr gegen die wahre, mit ±z·se, falls ``se`` gegeben."""
     fig, ax = _new_figure()
     x = np.arange(len(estimated))
-    ax.errorbar(x, estimated.to_numpy(), yerr=z * se.to_numpy(), fmt="o", color=SERIES_1,
-                markersize=6, capsize=3, linewidth=1.5, label=f"Chain-Ladder ± {z:g}·se (Mack)")
+    if se is None:
+        ax.plot(x, estimated.to_numpy(), "o", color=SERIES_1, markersize=6, label="Chain-Ladder")
+    else:
+        ax.errorbar(x, estimated.to_numpy(), yerr=z * se.to_numpy(), fmt="o", color=SERIES_1,
+                    markersize=6, capsize=3, linewidth=1.5,
+                    label=f"Chain-Ladder ± {z:g}·se (Mack)")
     ax.plot(x, true.to_numpy(), "D", color=SERIES_2, markersize=6, label="wahre Reserve")
     ax.set_xticks(x, [str(i) for i in estimated.index])
     ax.yaxis.set_major_formatter(_thousands)
