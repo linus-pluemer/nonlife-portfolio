@@ -61,6 +61,16 @@ def _run_collective(
     }
 
 
+def _de_amount(x: float) -> str:
+    """Betrag ohne Nachkommastellen mit Punkt als Tausendertrenner, z. B. 1.510.000."""
+    return f"{x:,.0f}".replace(",", ".")
+
+
+def _de_percent(x: float) -> str:
+    """Anteil als Prozent mit Vorzeichen und Dezimalkomma, z. B. -1,3%."""
+    return f"{x:+.1%}".replace(".", ",")
+
+
 def _run_reserving(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
     triangle = reserving.create_claims_triangle(portfolio.payments, portfolio.valuation_year)
     factors = reserving.calculate_development_factors(triangle)
@@ -73,11 +83,11 @@ def _run_reserving(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
     print(f"  {'Anfalljahr':<12}{'Chain-Ladder':>14}{'wahr':>14}{'Abw.':>8}")
     for year in estimated.index:
         est, tr = estimated[year], true[year]
-        dev = f"{est / tr - 1:+.1%}" if tr > 0 else ""
-        print(f"  {year:<12}{est:>14,.0f}{tr:>14,.0f}{dev:>8}")
+        dev = _de_percent(est / tr - 1) if tr > 0 else ""
+        print(f"  {year:<12}{_de_amount(est):>14}{_de_amount(tr):>14}{dev:>8}")
     total_est, total_true = float(estimated.sum()), float(true.sum())
-    print(f"  {'gesamt':<12}{total_est:>14,.0f}{total_true:>14,.0f}"
-          f"{total_est / total_true - 1:>+8.1%}")
+    print(f"  {'gesamt':<12}{_de_amount(total_est):>14}{_de_amount(total_true):>14}"
+          f"{_de_percent(total_est / total_true - 1):>8}")
     path = plots.save(plots.plot_reserves(estimated, true), figures_dir / "reserves.png")
     print(f"  Grafik: {path}")
     return {
