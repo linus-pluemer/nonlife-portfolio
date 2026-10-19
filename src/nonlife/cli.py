@@ -14,9 +14,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 
-from nonlife import collective, plots, pricing
+from nonlife import collective, plots, pricing, reserving
 from nonlife.data import save_portfolio
 from nonlife.simulate import Portfolio, default_parameters, simulate_portfolio
 
@@ -61,7 +62,32 @@ def _run_collective(
 
 
 def _run_reserving(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
-    raise NotImplementedError("Dreieck noch nicht auf payments umgestellt")
+    triangle = reserving.create_claims_triangle(portfolio.payments, portfolio.valuation_year)
+    factors = reserving.calculate_development_factors(triangle)
+    reserve = reserving.calculate_reserve(
+        triangle, reserving.project_triangle(triangle, factors)
+    )
+    estimated: pd.Series = reserve["reserve_by_year"]
+    true = portfolio.true_reserve().reindex(estimated.index)
+
+    print(f"  {'Anfalljahr':<12}{'Chain-Ladder':>14}{'wahr':>14}{'Abw.':>8}")
+    for year in estimated.index:
+        est, tr = estimated[year], true[year]
+        dev = f"{est / tr - 1:+.1%}" if tr > 0 else ""
+        print(f"  {year:<12}{est:>14,.0f}{tr:>14,.0f}{dev:>8}")
+    total_est, total_true = float(estimated.sum()), float(true.sum())
+    print(f"  {'gesamt':<12}{total_est:>14,.0f}{total_true:>14,.0f}"
+          f"{total_est / total_true - 1:>+8.1%}")
+    path = plots.save(plots.plot_reserves(estimated, true), figures_dir / "reserves.png")
+    print(f"  Grafik: {path}")
+    return {
+        "development_factors": [float(f) for f in factors],
+        "by_year": [
+            {"accident_year": int(y), "estimated": float(estimated[y]), "true": float(true[y])}
+            for y in estimated.index
+        ],
+        "total": {"estimated": total_est, "true": total_true},
+    }
 
 
 def _true_table(factors: Mapping[str, Mapping[str, float]]) -> tuple[

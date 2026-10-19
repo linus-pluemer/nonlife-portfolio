@@ -18,34 +18,53 @@ import numpy as np
 import pandas as pd
 
 
-def create_claims_triangle(claims: pd.DataFrame) -> pd.DataFrame:
-    """Erstellt ein kumuliertes Schadendreieck aus den Einzelschadendaten.
+def create_claims_triangle(payments: pd.DataFrame, valuation_year: int) -> pd.DataFrame:
+    """Kumuliertes Zahlungsdreieck aus Einzelzahlungen.
 
-    Das Dreieck soll folgende Struktur haben:
-      - Index: Anfalljahr (accident_year)
-      - Spalten: Abwicklungsjahr (development_year)
-      - Werte: kumulierte Schadensummen
+    Zelle (i, j) enthält C_{i,j} = Σ der Zahlungen des Anfalljahres i in den
+    Abwicklungsjahren 0..j. Beobachtet ist die Zelle genau dann, wenn
+    i + j ≤ valuation_year. Hat eine beobachtete Zelle keine Zahlung, ist der
+    Zuwachs 0 und C_{i,j} = C_{i,j-1}. Zellen nach dem Stichtag sind NaN.
 
-    Hinweis:
-      - Berechne das Abwicklungsjahr aus den Zeitstempeln (wann wurde der Schaden
-        gemeldet vs. wann trat er ein)
-      - Nutze groupby + sum, um kumulierte Schaeden zu berechnen
-      - Achte auf NaN-Werte fuer noch nicht abgewickelte Schaeden
+    Der Stichtag wird übergeben und nicht aus den Daten abgeleitet: Hätte das
+    jüngste Anfalljahr noch keine Zahlung, wäre max(accident_year) stillschweigend
+    falsch. Das Dreieck ist quadratisch; Abwicklungsjahre ohne Zahlungen ergeben
+    Faktoren f_j = 1.
+
+    Parameters
+    ----------
+    payments
+        Spalten accident_year, development_year, amount
+    valuation_year
+        Bewertungsstichtag (Ende des Kalenderjahres)
+
+    Returns
+    -------
+    DataFrame mit Index accident_year (alle Jahre von min(accident_year) bis
+    valuation_year) und Spalten development_year 0..valuation_year − min(accident_year).
     """
-    # Gruppiere nach (accident_year, development_year) und summiere claim_amount
-    grouped = claims.groupby(['accident_year', 'development_year'])['claim_amount'].sum()
+    if payments.empty:
+        raise ValueError("payments ist leer")
+    if (payments["development_year"] < 0).any():
+        raise ValueError("development_year darf nicht negativ sein")
+    if (payments["accident_year"] + payments["development_year"] > valuation_year).any():
+        raise ValueError(f"payments enthält Zahlungen nach dem Stichtag {valuation_year}")
 
-    # Erstelle ein Pivot-Table mit accident_year als Index und development_year als Spalten
-    triangle = grouped.unstack(fill_value=np.nan)
+    first_year = int(payments["accident_year"].min())
+    accident_years = pd.RangeIndex(first_year, valuation_year + 1, name="accident_year")
+    development_years = pd.RangeIndex(0, valuation_year - first_year + 1, name="development_year")
 
-    # Sortiere nach accident_year (Index) und development_year (Spalten)
-    triangle = triangle.sort_index()
-    triangle = triangle.reindex(sorted(triangle.columns), axis=1)
+    # Zuwächse auf dem vollen Gitter; beobachtete Zellen ohne Zahlung erhalten 0
+    incremental = payments.pivot_table(
+        index="accident_year", columns="development_year", values="amount",
+        aggfunc="sum", fill_value=0.0,
+    ).reindex(index=accident_years, columns=development_years, fill_value=0.0)
 
-    # Inkrementelle Werte zu kumulierten Werten aufsummieren (NaN bleiben NaN)
-    triangle = triangle.cumsum(axis=1)
-
-    return triangle
+    # Kumulieren, danach die Zellen jenseits der Kalenderjahrdiagonale ausblenden
+    after_valuation = (
+        accident_years.to_numpy()[:, None] + development_years.to_numpy() > valuation_year
+    )
+    return incremental.cumsum(axis=1).mask(after_valuation)
 
 
 def calculate_development_factors(triangle: pd.DataFrame) -> np.ndarray:
