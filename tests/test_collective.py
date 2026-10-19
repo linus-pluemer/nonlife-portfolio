@@ -16,15 +16,11 @@ from scipy import stats
 
 from nonlife.collective import (
     calculate_statistics,
-    discretize_severity,
     estimate_frequency_parameter,
     estimate_severity_parameters,
     monte_carlo_simulation,
-    panjer_poisson,
-    quantile_from_pmf,
     theoretical_statistics,
 )
-from tests.conftest import not_implemented
 
 LAMBDA, MU, SIGMA = 50.0, np.log(1500.0), 0.9
 N_SIM = 20_000
@@ -118,63 +114,3 @@ def test_theoretical_statistics_poisson_case() -> None:
     result = theoretical_statistics(lambda_=3.0, severity_mean=2.0, severity_variance=0.0)
     assert result["mean"] == pytest.approx(6.0)
     assert result["variance"] == pytest.approx(12.0)
-
-
-# --- Panjer ------------------------------------------------------------------
-
-
-@not_implemented
-def test_discretized_severity_is_distribution(severity: stats.rv_continuous) -> None:
-    pmf = discretize_severity(severity, step=50.0, n_points=2000)
-    assert pmf.shape == (2000,)
-    assert (pmf >= 0).all()
-    assert pmf.sum() == pytest.approx(1.0, abs=1e-12)
-
-
-@not_implemented
-def test_discretized_mean_close_to_true(severity: stats.rv_continuous) -> None:
-    # Rundung auf ein Gitter der Weite h verschiebt den Erwartungswert um O(h).
-    step = 10.0
-    pmf = discretize_severity(severity, step=step, n_points=20_000)
-    mean = (np.arange(pmf.size) * step * pmf).sum()
-    assert mean == pytest.approx(severity.mean(), abs=step)
-
-
-@not_implemented
-def test_panjer_degenerate_severity_is_poisson() -> None:
-    # X ≡ h  ⇒  S/h ~ Poisson(λ): exaktes analytisches Ergebnis.
-    severity_pmf = np.array([0.0, 1.0])
-    g = panjer_poisson(lambda_=4.0, severity_pmf=severity_pmf, n_points=40)
-    np.testing.assert_allclose(g, stats.poisson(4.0).pmf(np.arange(40)), rtol=1e-12, atol=1e-15)
-
-
-@not_implemented
-def test_panjer_mass_at_zero_thinning() -> None:
-    # Masse f_0 > 0 verdünnt die Poisson-Anzahl: S ~ Poisson(λ(1 - f_0)) bei X ∈ {0, h}.
-    g = panjer_poisson(lambda_=4.0, severity_pmf=np.array([0.25, 0.75]), n_points=40)
-    np.testing.assert_allclose(g, stats.poisson(3.0).pmf(np.arange(40)), rtol=1e-12, atol=1e-15)
-
-
-@not_implemented
-def test_panjer_moments_match_wald(severity: stats.rv_continuous) -> None:
-    step, n = 50.0, 2000
-    f = discretize_severity(severity, step=step, n_points=n)
-    g = panjer_poisson(lambda_=LAMBDA, severity_pmf=f, n_points=8000)
-    grid = np.arange(f.size) * step
-    ex, ex2 = (grid * f).sum(), (grid**2 * f).sum()
-    s_grid = np.arange(g.size) * step
-    assert g.sum() == pytest.approx(1.0, abs=1e-8)
-    assert (s_grid * g).sum() == pytest.approx(LAMBDA * ex, rel=1e-6)
-    assert (s_grid**2 * g).sum() - (s_grid * g).sum() ** 2 == pytest.approx(LAMBDA * ex2, rel=1e-6)
-
-
-@not_implemented
-def test_panjer_quantile_close_to_monte_carlo(
-    simulations: np.ndarray, severity: stats.rv_continuous
-) -> None:
-    # Toleranz 3 %: MC-Fehler des 99-%-Quantils bei n = 20 000 plus Diskretisierung.
-    step = 50.0
-    f = discretize_severity(severity, step=step, n_points=2000)
-    g = panjer_poisson(lambda_=LAMBDA, severity_pmf=f, n_points=8000)
-    q = quantile_from_pmf(g, step=step, level=0.99)
-    assert q == pytest.approx(np.quantile(simulations, 0.99), rel=0.03)

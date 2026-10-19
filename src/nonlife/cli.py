@@ -1,8 +1,4 @@
-"""Kommandozeile: ``nonlife run`` erzeugt Daten, Kennzahlen und Grafiken neu.
-
-Teile, deren Kernfunktionen noch ``NotImplementedError`` werfen, werden
-übersprungen und als offen gemeldet.
-"""
+"""Kommandozeile: ``nonlife run`` erzeugt Daten, Kennzahlen und Grafiken neu."""
 
 from __future__ import annotations
 
@@ -14,9 +10,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 
-from nonlife import collective, plots, pricing
+from nonlife import collective, plots, pricing, reserving
 from nonlife.data import save_portfolio
 from nonlife.simulate import Portfolio, default_parameters, simulate_portfolio
 
@@ -60,8 +57,43 @@ def _run_collective(
     }
 
 
+def _de_amount(x: float) -> str:
+    """Betrag ohne Nachkommastellen mit Punkt als Tausendertrenner, z. B. 1.510.000."""
+    return f"{x:,.0f}".replace(",", ".")
+
+
+def _de_percent(x: float) -> str:
+    """Anteil als Prozent mit Vorzeichen und Dezimalkomma, z. B. -1,3%."""
+    return f"{x:+.1%}".replace(".", ",")
+
+
 def _run_reserving(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
-    raise NotImplementedError("Dreieck noch nicht auf payments umgestellt")
+    triangle = reserving.create_claims_triangle(portfolio.payments, portfolio.valuation_year)
+    factors = reserving.calculate_development_factors(triangle)
+    reserve = reserving.calculate_reserve(
+        triangle, reserving.project_triangle(triangle, factors)
+    )
+    estimated: pd.Series = reserve["reserve_by_year"]
+    true = portfolio.true_reserve().reindex(estimated.index)
+
+    print(f"  {'Anfalljahr':<12}{'Chain-Ladder':>14}{'wahr':>14}{'Abw.':>8}")
+    for year in estimated.index:
+        est, tr = estimated[year], true[year]
+        dev = _de_percent(est / tr - 1) if tr > 0 else ""
+        print(f"  {year:<12}{_de_amount(est):>14}{_de_amount(tr):>14}{dev:>8}")
+    total_est, total_true = float(estimated.sum()), float(true.sum())
+    print(f"  {'gesamt':<12}{_de_amount(total_est):>14}{_de_amount(total_true):>14}"
+          f"{_de_percent(total_est / total_true - 1):>8}")
+    path = plots.save(plots.plot_reserves(estimated, true), figures_dir / "reserves.png")
+    print(f"  Grafik: {path}")
+    return {
+        "development_factors": [float(f) for f in factors],
+        "by_year": [
+            {"accident_year": int(y), "estimated": float(estimated[y]), "true": float(true[y])}
+            for y in estimated.index
+        ],
+        "total": {"estimated": total_est, "true": total_true},
+    }
 
 
 def _true_table(factors: Mapping[str, Mapping[str, float]]) -> tuple[
@@ -130,11 +162,7 @@ def _run_pricing(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
 
 def _step(name: str, func: Callable[[], dict[str, Any]], results: dict[str, Any]) -> None:
     print(f"\n[{name}]")
-    try:
-        results[name] = func()
-    except NotImplementedError as exc:
-        results[name] = "offen"
-        print(f"  offen{': ' + str(exc) if str(exc) else ''}")
+    results[name] = func()
 
 
 def run(args: argparse.Namespace) -> None:

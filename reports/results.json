@@ -1,0 +1,279 @@
+{
+  "seed": 42,
+  "n_policies_per_year": 10000,
+  "accident_years": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ],
+  "collective": {
+    "frequency": 0.08464256411649491,
+    "exposure_per_year": 8496.90705269932,
+    "lambda": 719.2,
+    "mu": 7.704646627464386,
+    "sigma": 0.9650714657917842,
+    "simulation": {
+      "mean": 2542947.227335043,
+      "variance": 21976520467.4115,
+      "std": 148244.7991243251,
+      "quantile_99": 2895915.698423211
+    },
+    "theory": {
+      "mean": 2542014.862947166,
+      "variance": 22803015119.733994,
+      "std": 151006.67243447885
+    }
+  },
+  "reserving": {
+    "development_factors": [
+      1.547536311396019,
+      1.1735504248281745,
+      1.0846050517965156,
+      1.0454734893516637,
+      1.0320418573678967,
+      1.020420975526142,
+      1.009501520860736,
+      1.007302644254542,
+      1.0032131476123953
+    ],
+    "by_year": [
+      {
+        "accident_year": 2015,
+        "estimated": 0.0,
+        "true": 0.0
+      },
+      {
+        "accident_year": 2016,
+        "estimated": 7678.150071492419,
+        "true": 4723.116355329752
+      },
+      {
+        "accident_year": 2017,
+        "estimated": 24961.879144603852,
+        "true": 25808.477881968487
+      },
+      {
+        "accident_year": 2018,
+        "estimated": 52051.90589608811,
+        "true": 50320.43402730441
+      },
+      {
+        "accident_year": 2019,
+        "estimated": 97815.49808864342,
+        "true": 101218.35473538376
+      },
+      {
+        "accident_year": 2020,
+        "estimated": 173013.5127788554,
+        "true": 184985.1516916193
+      },
+      {
+        "accident_year": 2021,
+        "estimated": 298415.2424914376,
+        "true": 294828.0770691857
+      },
+      {
+        "accident_year": 2022,
+        "estimated": 426365.4211426596,
+        "true": 435394.4766674009
+      },
+      {
+        "accident_year": 2023,
+        "estimated": 736278.7586527397,
+        "true": 738507.0803257292
+      },
+      {
+        "accident_year": 2024,
+        "estimated": 1509999.7600262384,
+        "true": 1536152.041968179
+      }
+    ],
+    "total": {
+      "estimated": 3326580.1282927585,
+      "true": 3371937.2107221005
+    }
+  },
+  "pricing": {
+    "frequency": [
+      {
+        "feature": "driver_age",
+        "level": "18-24",
+        "factor": 1.8842934344126687,
+        "lower": 1.7548089576405586,
+        "upper": 2.02333235849481,
+        "true": 1.9,
+        "one_way": 1.7945929768665603
+      },
+      {
+        "feature": "driver_age",
+        "level": "25-39",
+        "factor": 1.0,
+        "lower": 1.0,
+        "upper": 1.0,
+        "true": 1.0,
+        "one_way": 1.0
+      },
+      {
+        "feature": "driver_age",
+        "level": "40-59",
+        "factor": 0.8811700741459425,
+        "lower": 0.8306171962173601,
+        "upper": 0.9347996924532462,
+        "true": 0.85,
+        "one_way": 0.8899849248660124
+      },
+      {
+        "feature": "driver_age",
+        "level": "60+",
+        "factor": 1.176008581878463,
+        "lower": 1.1029552594328191,
+        "upper": 1.253900530256306,
+        "true": 1.1,
+        "one_way": 1.1630815702012012
+      },
+      {
+        "feature": "region",
+        "level": "urban",
+        "factor": 1.310723204041875,
+        "lower": 1.2449790715684996,
+        "upper": 1.379939114518098,
+        "true": 1.3,
+        "one_way": 1.3110318729750403
+      },
+      {
+        "feature": "region",
+        "level": "suburban",
+        "factor": 1.0,
+        "lower": 1.0,
+        "upper": 1.0,
+        "true": 1.0,
+        "one_way": 1.0
+      },
+      {
+        "feature": "region",
+        "level": "rural",
+        "factor": 0.8075694568128047,
+        "lower": 0.7566666232074788,
+        "upper": 0.8618966498250091,
+        "true": 0.8,
+        "one_way": 0.8074215058195304
+      },
+      {
+        "feature": "vehicle_power",
+        "level": "low",
+        "factor": 1.0,
+        "lower": 1.0,
+        "upper": 1.0,
+        "true": 1.0,
+        "one_way": 1.0
+      },
+      {
+        "feature": "vehicle_power",
+        "level": "medium",
+        "factor": 1.122309240567893,
+        "lower": 1.0647601196011278,
+        "upper": 1.1829688286371338,
+        "true": 1.1,
+        "one_way": 1.0259323360974915
+      },
+      {
+        "feature": "vehicle_power",
+        "level": "high",
+        "factor": 1.2288462805726066,
+        "lower": 1.1514981101822843,
+        "upper": 1.3113900647549335,
+        "true": 1.25,
+        "one_way": 1.0663798989976374
+      }
+    ],
+    "severity": [
+      {
+        "feature": "driver_age",
+        "level": "18-24",
+        "factor": 1.0714809984393072,
+        "lower": 0.9874892996692006,
+        "upper": 1.1626166788856218,
+        "true": 1.1
+      },
+      {
+        "feature": "driver_age",
+        "level": "25-39",
+        "factor": 1.0,
+        "lower": 1.0,
+        "upper": 1.0,
+        "true": 1.0
+      },
+      {
+        "feature": "driver_age",
+        "level": "40-59",
+        "factor": 0.9845362127214948,
+        "lower": 0.9198927045018301,
+        "upper": 1.0537224063375055,
+        "true": 0.97
+      },
+      {
+        "feature": "driver_age",
+        "level": "60+",
+        "factor": 0.9525321141200124,
+        "lower": 0.8849494171393519,
+        "upper": 1.025276033700202,
+        "true": 0.95
+      },
+      {
+        "feature": "region",
+        "level": "urban",
+        "factor": 1.1099663033923155,
+        "lower": 1.046291863070887,
+        "upper": 1.1775157947328232,
+        "true": 1.15
+      },
+      {
+        "feature": "region",
+        "level": "suburban",
+        "factor": 1.0,
+        "lower": 1.0,
+        "upper": 1.0,
+        "true": 1.0
+      },
+      {
+        "feature": "region",
+        "level": "rural",
+        "factor": 0.881164973527443,
+        "lower": 0.8176470885497595,
+        "upper": 0.9496171654555666,
+        "true": 0.9
+      },
+      {
+        "feature": "vehicle_power",
+        "level": "low",
+        "factor": 1.0,
+        "lower": 1.0,
+        "upper": 1.0,
+        "true": 1.0
+      },
+      {
+        "feature": "vehicle_power",
+        "level": "medium",
+        "factor": 1.1163680260983346,
+        "lower": 1.0509093622758794,
+        "upper": 1.185903955594912,
+        "true": 1.15
+      },
+      {
+        "feature": "vehicle_power",
+        "level": "high",
+        "factor": 1.3934546973678257,
+        "lower": 1.2930872368977557,
+        "upper": 1.5016125271445935,
+        "true": 1.4
+      }
+    ]
+  }
+}
