@@ -58,7 +58,7 @@ Kumuliertes Zahlungsdreieck $C_{i,j}$ (Anfalljahr $i$, Abwicklungsjahr $j$) aus 
 
 $$\hat f_j = \frac{\sum_i C_{i,j+1}}{\sum_i C_{i,j}},$$
 
-summiert über alle Anfalljahre, für die beide Werte beobachtet sind. Hochrechnung und Reserve:
+summiert über alle Anfalljahre, für die beide Werte beobachtet sind. Mit dem Stichtag $I$ ist $C_{i,I-i}$ der letzte beobachtete Wert des Anfalljahres $i$. Hochrechnung und Reserve:
 
 $$\hat C_{i,J} = C_{i,I-i} \prod_{j \ge I-i} \hat f_j, \qquad \hat R_i = \hat C_{i,J} - C_{i,I-i}.$$
 
@@ -114,4 +114,4 @@ Für Panjer und Mack sind Signaturen und Tests vorhanden; die Tests laufen als `
 
 ## Entstehung
 
-Die Chain-Ladder-Funktionen (`calculate_development_factors`, `project_triangle`, `calculate_reserve`) hat Linus Plümer selbst geschrieben. Für die übrige Kernlogik hat er Signaturen, fachliche Annahmen und Tests festgelegt und freigegeben; implementiert wurde sie mit Claude Code und anschließend gemeinsam reviewt. Projektstruktur, Tooling, CLI und Grafiken stammen weitgehend von Claude Code.
+Die Chain-Ladder-Funktionen (`calculate_development_factors`, `project_triangle`, `calculate_reserve`) hat Linus Plümer selbst geschrieben. Für die übrige Kernlogik hat er Signaturen, fachliche Annahmen und Tests festgelegt und freigegeben; implementiert wurde sie mit Claude Code; die gemeinsamen Reviews dieser Teile laufen. Projektstruktur, Tooling, CLI und Grafiken stammen weitgehend von Claude Code.
