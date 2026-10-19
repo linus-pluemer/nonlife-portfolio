@@ -46,7 +46,7 @@ Das Gamma-GLM trifft die wahren Schwerefaktoren; alle sieben 95-%-Intervalle ent
 
 Jahresgesamtschaden $S = X_1 + \dots + X_N$ mit $N \sim \text{Poisson}(\lambda)$ und u.i.v. Schadenhöhen $X_k \sim \text{Lognormal}(\mu, \sigma^2)$, unabhängig von $N$. Dann gilt
 
-$$E[S] = E[N]\,E[X], \qquad \operatorname{Var}[S] = E[N]\operatorname{Var}[X] + \operatorname{Var}[N]\,E[X]^2 = \lambda\,E[X^2].$$
+$$E[S] = E[N]\,E[X], \qquad \mathrm{Var}[S] = E[N]\mathrm{Var}[X] + \mathrm{Var}[N]\,E[X]^2 = \lambda\,E[X^2].$$
 
 Das Portfolio ist heterogen: Police $i$ hat die Schadenanzahl $N_i \sim \text{Poisson}(\lambda_i)$ mit $\lambda_i = \lambda(x_i)\,e_i$. Die Summe unabhängiger zusammengesetzter Poisson-Variablen ist wieder zusammengesetzt Poisson mit $\lambda = \sum_i \lambda_i$ und der Mischung $\sum_i (\lambda_i/\lambda)\,F_i$ der Schwereverteilungen. Daher darf das Portfolio als ein kollektives Modell behandelt werden. Geschätzt wird $\hat\lambda$ als Schadenfrequenz je Exposure-Jahr mal mittlere Exposure eines Anfalljahres, $(\hat\mu, \hat\sigma)$ per Maximum-Likelihood aus allen Einzelschäden.
 
