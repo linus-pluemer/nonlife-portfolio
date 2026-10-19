@@ -1,4 +1,4 @@
-"""Laden, Validieren und Aggregieren der Portfoliodaten, Abruf von freMTPL2."""
+"""Laden, Validieren und Aggregieren der Portfoliodaten."""
 
 from __future__ import annotations
 
@@ -14,10 +14,6 @@ DEFAULT_DATA_DIR = Path("data")
 POLICY_COLUMNS: tuple[str, ...] = ("policy_id", "accident_year", "exposure")
 CLAIM_COLUMNS: tuple[str, ...] = ("claim_id", "policy_id", "accident_year", "claim_amount")
 PAYMENT_COLUMNS: tuple[str, ...] = ("claim_id", "accident_year", "development_year", "amount")
-
-FREMTPL2_FREQ_ID = 41214
-FREMTPL2_SEV_ID = 41215
-
 
 class DataValidationError(ValueError):
     """Die Daten verletzen eine erwartete Struktur oder einen Wertebereich."""
@@ -141,25 +137,3 @@ def observed_frequency_by(
     result["n_claims"] = result["n_claims"].astype(int)
     result["frequency"] = result["n_claims"] / result["exposure"]
     return result.rename_axis(feature).reset_index()
-
-
-def fetch_fremtpl2(
-    cache_dir: Path = DEFAULT_DATA_DIR / "openml",
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Lädt freMTPL2freq und freMTPL2sev von OpenML und speichert sie lokal zwischen.
-
-    Beim ersten Aufruf ist eine Internetverbindung nötig, danach wird der Cache
-    in ``cache_dir`` verwendet.
-
-    Returns
-    -------
-    (freq, sev) -- freq mit einer Zeile je Police (IDpol, ClaimNb, Exposure, Merkmale),
-    sev mit einer Zeile je Schaden (IDpol, ClaimAmount).
-    """
-    from sklearn.datasets import fetch_openml  # Import hier, damit sklearn nur bei Bedarf lädt
-
-    freq = fetch_openml(data_id=FREMTPL2_FREQ_ID, as_frame=True, data_home=cache_dir).frame
-    sev = fetch_openml(data_id=FREMTPL2_SEV_ID, as_frame=True, data_home=cache_dir).frame
-    freq["IDpol"] = freq["IDpol"].astype(int)
-    sev["IDpol"] = sev["IDpol"].astype(int)
-    return freq, sev
