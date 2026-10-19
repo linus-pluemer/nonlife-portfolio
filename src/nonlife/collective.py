@@ -6,7 +6,7 @@ u.i.v. Schadenhöhen X_i ~ Lognormal(μ, σ), unabhängig von N. Es gilt
     E[S]   = E[N]·E[X]
     Var[S] = E[N]·Var[X] + Var[N]·E[X]²
 
-Die Verteilung von S wird per Monte Carlo und per Panjer-Rekursion bestimmt.
+Die Verteilung von S wird per Monte Carlo bestimmt.
 """
 
 from __future__ import annotations
@@ -162,64 +162,3 @@ def theoretical_statistics(
     my_dict["variance"] = variance
     my_dict["std"] = std
     return my_dict
-
-
-
-
-# ---------------------------------------------------------------------------
-# Panjer-Rekursion -- offen, Implementierung durch Linus
-# ---------------------------------------------------------------------------
-
-
-def discretize_severity(
-    severity: stats.rv_continuous, step: float, n_points: int
-) -> np.ndarray:
-    """Diskretisiert eine stetige Schwereverteilung auf das Gitter {0, h, 2h, ...}.
-
-    Vorschlag: Methode der Rundung (Masse von [kh - h/2, kh + h/2) auf kh,
-    Masse von [0, h/2) auf 0). Die Restmasse oberhalb des Gitters wird dem
-    letzten Punkt zugeschlagen, damit die Gewichte zu 1 summieren.
-
-    Parameters
-    ----------
-    severity
-        eingefrorene scipy-Verteilung, z. B. ``stats.lognorm(s=sigma, scale=np.exp(mu))``
-    step
-        Gitterweite h > 0
-    n_points
-        Anzahl der Gitterpunkte
-
-    Returns
-    -------
-    np.ndarray der Länge ``n_points`` mit f_k = P(X_disc = k·h), Summe 1.
-    """
-    raise NotImplementedError
-
-
-def panjer_poisson(lambda_: float, severity_pmf: np.ndarray, n_points: int) -> np.ndarray:
-    """Verteilung des Gesamtschadens per Panjer-Rekursion für N ~ Poisson(λ).
-
-    Poisson gehört zur (a, b, 0)-Klasse mit a = 0, b = λ. Mit f_k = P(X = k·h):
-
-        g_0 = exp(-λ·(1 - f_0))
-        g_s = (λ / s) · Σ_{k=1}^{s} k · f_k · g_{s-k},   s ≥ 1
-
-    Parameters
-    ----------
-    lambda_
-        erwartete Schadenanzahl λ > 0
-    severity_pmf
-        diskretisierte Schwere auf dem Gitter {0, h, 2h, ...}
-    n_points
-        Länge des Ergebnisgitters für S
-
-    Returns
-    -------
-    np.ndarray der Länge ``n_points`` mit g_s = P(S = s·h).
-    """
-    raise NotImplementedError
-
-
-def quantile_from_pmf(pmf: np.ndarray, step: float, level: float) -> float:
-    """Kleinstes s·h mit P(S ≤ s·h) ≥ ``level``."""
-    raise NotImplementedError

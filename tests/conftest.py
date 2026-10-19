@@ -1,10 +1,4 @@
-"""Gemeinsame Fixtures.
-
-Tests für Funktionen, die noch nicht implementiert sind, tragen den Marker
-``not_implemented``. Sie laufen als xfail, solange die Funktion
-``NotImplementedError`` wirft, und werden zu normalen Tests, sobald die
-Implementierung steht. Andere Fehler schlagen weiterhin fehl.
-"""
+"""Gemeinsame Fixtures."""
 
 from __future__ import annotations
 
@@ -13,8 +7,6 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
-
-not_implemented = pytest.mark.xfail(raises=NotImplementedError, reason="noch nicht implementiert")
 
 
 @pytest.fixture

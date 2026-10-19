@@ -18,12 +18,9 @@ from nonlife.reserving import (
     calculate_development_factors,
     calculate_reserve,
     create_claims_triangle,
-    mack_sigma2,
-    mack_standard_error,
     project_triangle,
 )
 from nonlife.simulate import Portfolio, default_parameters, simulate_portfolio
-from tests.conftest import not_implemented
 
 cl = pytest.importorskip("chainladder")
 
@@ -171,41 +168,3 @@ def test_factor_one_gives_zero_reserve() -> None:
     np.testing.assert_allclose(factors, [1.0, 1.0])
     reserve = calculate_reserve(triangle, project_triangle(triangle, factors))
     assert reserve["total_reserve"] == pytest.approx(0.0)
-
-
-# --- Mack ------------------------------------------------------------------
-
-
-@not_implemented
-def test_mack_sigma2_is_positive_and_complete(raa_triangle: pd.DataFrame) -> None:
-    factors = calculate_development_factors(raa_triangle)
-    sigma2 = mack_sigma2(raa_triangle, factors)
-    assert sigma2.shape == factors.shape
-    assert (sigma2 > 0).all()
-
-
-@not_implemented
-def test_mack_standard_error_matches_chainladder(raa_triangle: pd.DataFrame) -> None:
-    factors = calculate_development_factors(raa_triangle)
-    result = mack_standard_error(raa_triangle, factors)
-
-    fit = _cl_fit()
-    summary = fit.summary_.to_frame(origin_as_datetime=False)  # type: ignore[attr-defined]
-    expected_se = summary["Mack Std Err"].fillna(0.0).to_numpy()
-    by_year = result.drop(index="total")
-
-    np.testing.assert_allclose(by_year["se"].to_numpy(dtype=float), expected_se, rtol=1e-6)
-    np.testing.assert_allclose(
-        by_year["reserve"].to_numpy(dtype=float), summary["IBNR"].fillna(0.0), rtol=1e-9
-    )
-    expected_total = float(fit.total_mack_std_err_.to_numpy().ravel()[0])  # type: ignore[attr-defined]
-    assert result.loc["total", "se"] == pytest.approx(expected_total, rel=1e-6)
-
-
-@not_implemented
-def test_mack_total_se_exceeds_largest_single_se(raa_triangle: pd.DataFrame) -> None:
-    # Die Reserven der Anfalljahre sind über gemeinsame f̂_j positiv korreliert,
-    # daher ist se(Gesamt) ≥ max_i se(R_i).
-    factors = calculate_development_factors(raa_triangle)
-    result = mack_standard_error(raa_triangle, factors)
-    assert result.loc["total", "se"] >= result.drop(index="total")["se"].max()

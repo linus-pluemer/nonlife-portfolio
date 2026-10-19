@@ -1,6 +1,6 @@
-"""Reservierung: Schadendreieck, Chain-Ladder und Standardfehler nach Mack.
+"""Reservierung: Zahlungsdreieck und Chain-Ladder.
 
-Bezeichnungen: C_{i,j} ist der kumulierte Schadenaufwand des Anfalljahres i
+Bezeichnungen: C_{i,j} ist der kumulierte Zahlbetrag des Anfalljahres i
 nach j Abwicklungsjahren. Die volumengewichteten Entwicklungsfaktoren sind
 
     f_j = Σ_i C_{i,j+1} / Σ_i C_{i,j}
@@ -141,41 +141,3 @@ def calculate_reserve(
         'total_reserve': reserve_by_year.sum(),
         'projected_total': ultimate.sum()
     }
-
-
-
-
-# ---------------------------------------------------------------------------
-# Standardfehler nach Mack -- offen, Implementierung durch Linus
-# ---------------------------------------------------------------------------
-
-
-def mack_sigma2(triangle: pd.DataFrame, factors: np.ndarray) -> np.ndarray:
-    """Schätzer der Varianzparameter σ_j² im Modell von Mack (1993).
-
-        σ_j² = 1/(n_j - 1) · Σ_i C_{i,j} · (C_{i,j+1}/C_{i,j} - f_j)²
-
-    mit n_j der Anzahl beobachteter Paare. Für das letzte j (n_j = 1) die
-    Extrapolation von Mack: σ_{J-1}² = min(σ_{J-2}⁴ / σ_{J-3}², σ_{J-3}², σ_{J-2}²).
-
-    Returns
-    -------
-    np.ndarray der Länge ``len(factors)``.
-    """
-    raise NotImplementedError
-
-
-def mack_standard_error(triangle: pd.DataFrame, factors: np.ndarray) -> pd.DataFrame:
-    """Standardfehler der Chain-Ladder-Reserve je Anfalljahr und gesamt nach Mack (1993).
-
-    msep(R̂_i) = Ĉ_{i,J}² · Σ_{j=I-i}^{J-1} σ_j²/f_j² · (1/Ĉ_{i,j} + 1/Σ_k C_{k,j})
-
-    mit Σ_k über alle Anfalljahre k, für die C_{k,j+1} beobachtet ist.
-    Für die Gesamtreserve kommen die Kovarianzterme zwischen den Anfalljahren hinzu.
-
-    Returns
-    -------
-    DataFrame mit Index Anfalljahr plus Zeile "total" und den Spalten
-    ultimate, reserve, se. Für das älteste Anfalljahr ist se = 0.
-    """
-    raise NotImplementedError

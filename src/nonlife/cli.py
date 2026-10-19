@@ -1,8 +1,4 @@
-"""Kommandozeile: ``nonlife run`` erzeugt Daten, Kennzahlen und Grafiken neu.
-
-Teile, deren Kernfunktionen noch ``NotImplementedError`` werfen, werden
-übersprungen und als offen gemeldet.
-"""
+"""Kommandozeile: ``nonlife run`` erzeugt Daten, Kennzahlen und Grafiken neu."""
 
 from __future__ import annotations
 
@@ -166,11 +162,7 @@ def _run_pricing(portfolio: Portfolio, figures_dir: Path) -> dict[str, Any]:
 
 def _step(name: str, func: Callable[[], dict[str, Any]], results: dict[str, Any]) -> None:
     print(f"\n[{name}]")
-    try:
-        results[name] = func()
-    except NotImplementedError as exc:
-        results[name] = "offen"
-        print(f"  offen{': ' + str(exc) if str(exc) else ''}")
+    results[name] = func()
 
 
 def run(args: argparse.Namespace) -> None:

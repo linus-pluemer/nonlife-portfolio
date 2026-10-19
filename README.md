@@ -110,8 +110,6 @@ mypy src
 - Standardfehler der Reserve nach Mack (1993) und Intervall in der Reservegrafik
 - Frequenz-GLM auf freMTPL2
 
-Für Panjer und Mack sind Signaturen und Tests vorhanden; die Tests laufen als `xfail`, bis die Funktionen implementiert sind.
-
 ## Entstehung
 
 Die Chain-Ladder-Funktionen (`calculate_development_factors`, `project_triangle`, `calculate_reserve`) hat Linus Plümer selbst geschrieben. Für die übrige Kernlogik hat er Signaturen, fachliche Annahmen und Tests festgelegt und freigegeben; implementiert wurde sie mit Claude Code; die gemeinsamen Reviews dieser Teile laufen. Projektstruktur, Tooling, CLI und Grafiken stammen weitgehend von Claude Code.
