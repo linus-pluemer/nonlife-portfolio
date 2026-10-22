@@ -114,7 +114,8 @@ def fit_frequency_glm(
     """Schätzt das Poisson-GLM mit Log-Link und log(Exposure) als Offset.
 
     Der Offset hat den festen Koeffizienten 1, weil E[N_i] proportional zur
-    Exposure angenommen wird. Die Dispersion ist 1 (reines Poisson-Modell).
+    Exposure angenommen wird. Die Dispersion ist auf 1 festgelegt
+    (``scale=1.0``, reines Poisson-Modell).
 
     Parameters
     ----------
@@ -136,7 +137,7 @@ def fit_frequency_glm(
         family=sm.families.Poisson(),
         offset=np.log(data[exposure].to_numpy(float)),
     )
-    return TariffModel(model.fit(), levels, ref)
+    return TariffModel(model.fit(scale=1.0), levels, ref)
 
 
 def fit_severity_glm(
@@ -148,11 +149,12 @@ def fit_severity_glm(
     """Schätzt das Gamma-GLM mit Log-Link für die Einzelschadenhöhe.
 
     Das Gamma-GLM unterstellt Var[X] = φ·μ², also einen festen
-    Variationskoeffizienten. Stimmen Erwartungsstruktur und Varianzfunktion,
-    sind die Schätzer auch ohne Gamma-Verteilung konsistent
-    (Quasi-Likelihood); das trifft auf die lognormalen Schäden der Simulation
-    zu. Die Dispersion φ wird über die Pearson-Statistik geschätzt
-    (``scale="X2"``), damit gelten auch die Standardfehler.
+    Variationskoeffizienten. Für konsistente Schätzer reicht auch ohne
+    Gamma-Verteilung eine korrekt spezifizierte Erwartungsstruktur
+    (Quasi-Likelihood); die Varianzfunktion wird erst für gültige
+    Standardfehler gebraucht. Beides trifft auf die lognormalen Schäden der
+    Simulation mit festem σ zu. Die Dispersion φ wird über die
+    Pearson-Statistik geschätzt (``scale="X2"``).
 
     Parameters
     ----------
