@@ -125,6 +125,22 @@ def test_chain_ladder_exact_for_deterministic_pattern() -> None:
     assert reserve["total_reserve"] == pytest.approx(portfolio.true_reserve().sum(), rel=1e-3)
 
 
+@pytest.mark.parametrize(
+    "next_column",
+    [[5.0, 4.0, np.nan], [0.0, 0.0, np.nan]],
+    ids=["x_over_zero", "zero_over_zero"],
+)
+def test_development_factors_raise_on_zero_column_sum(next_column: list[float]) -> None:
+    # Bis Abwicklungsjahr 0 keine Zahlung: f_0 ist nicht definiert. Ohne Prüfung
+    # lieferte numpy still inf (x/0) bzw. NaN (0/0).
+    triangle = pd.DataFrame(
+        {0: [0.0, 0.0, 0.0], 1: next_column, 2: [6.0, np.nan, np.nan]},
+        index=pd.RangeIndex(2015, 2018, name="accident_year"),
+    )
+    with pytest.raises(ValueError, match="Abwicklungsjahr 0"):
+        calculate_development_factors(triangle)
+
+
 # --- Chain-Ladder gegen chainladder -----------------------------------------
 
 

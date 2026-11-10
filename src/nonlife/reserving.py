@@ -78,6 +78,11 @@ def calculate_development_factors(triangle: pd.DataFrame) -> np.ndarray:
     vom Jahr j zum Jahr j+1 mit diesem Faktor."
 
     Returns: Array der Entwicklungsfaktoren
+
+    Raises: ValueError, wenn die Summe von Spalte j ueber die genutzten Zeilen
+    0 ist, also bis Abwicklungsjahr j in keinem Anfalljahr gezahlt wurde. Der
+    Faktor ist dann nicht definiert (x/0 bzw. 0/0); numpy wuerde still inf oder
+    NaN liefern, die in Hochrechnung und Reserve weiterlaufen.
     """
     columns = triangle.columns.tolist()
     factors = []
@@ -88,7 +93,12 @@ def calculate_development_factors(triangle: pd.DataFrame) -> np.ndarray:
 
         # Nur Zeilen verwenden, in denen beide Spalten beobachtet sind
         both = triangle[col_j].notna() & triangle[col_j1].notna()
-        factor = triangle.loc[both, col_j1].sum() / triangle.loc[both, col_j].sum()
+        denominator = triangle.loc[both, col_j].sum()
+        if denominator == 0:
+            raise ValueError(
+                f"Spaltensumme 0 in Abwicklungsjahr {col_j}: Faktor f_{col_j} nicht definiert"
+            )
+        factor = triangle.loc[both, col_j1].sum() / denominator
         factors.append(factor)
 
     return np.array(factors)
@@ -113,8 +123,8 @@ def project_triangle(triangle: pd.DataFrame, factors: np.ndarray) -> pd.DataFram
         factor = factors[col_idx - 1]
 
         # Fülle NaN-Werte mit Wert_vorherige_Spalte * Faktor
-        mask = projected[curr_col].isna()
-        projected.loc[mask, curr_col] = projected.loc[mask, prev_col] * factor
+        to_fill = projected[curr_col].isna()
+        projected.loc[to_fill, curr_col] = projected.loc[to_fill, prev_col] * factor
 
     return projected
 
@@ -122,9 +132,13 @@ def project_triangle(triangle: pd.DataFrame, factors: np.ndarray) -> pd.DataFram
 def calculate_reserve(
     original_triangle: pd.DataFrame, projected_triangle: pd.DataFrame
 ) -> dict[str, Any]:
-    """Berechnet die Reserve (IBNR) pro Anfalljahr und insgesamt.
+    """Berechnet die Schadenreserve pro Anfalljahr und insgesamt.
 
     Reserve fuer ein Anfalljahr = projizierter Gesamtschaden - beobachteter Gesamtschaden
+
+    Auf einem Zahlungsdreieck ist das die gesamte Schadenreserve (RBNS + IBNR),
+    keine IBNR-Reserve im engeren Sinn; dafuer braeuchte es ein Aufwandsdreieck
+    mit Einzelreserven.
 
     Returns: Dictionary mit 'reserve_by_year', 'total_reserve', und ggf. 'projected_total'
     """
