@@ -16,12 +16,12 @@ import pandas as pd
 
 
 def estimate_frequency_parameter(claims: pd.DataFrame, policies: pd.DataFrame) -> float:
-    """Schaetzt die Schadenfrequenz je Exposure-Jahr.
+    """Schätzt die Schadenfrequenz je Exposure-Jahr.
 
     Die Frequenz wird definiert als:
-        (Anzahl Schaeden) / (Summe Exposure)
+        (Anzahl Schäden) / (Summe Exposure)
 
-    Das ist der ML-Schaetzer der Poisson-Rate je Exposure-Jahr, nicht das λ
+    Das ist der ML-Schätzer der Poisson-Rate je Exposure-Jahr, nicht das λ
     des Jahresgesamtschadens. Dieses entsteht erst durch Multiplikation mit
     der Exposure eines Jahres (siehe ``cli._run_collective``).
 
@@ -35,23 +35,22 @@ def estimate_frequency_parameter(claims: pd.DataFrame, policies: pd.DataFrame) -
     Returns
     -------
     float
-        Geschaetzte Frequenz je Exposure-Jahr
+        Geschätzte Frequenz je Exposure-Jahr
     """
     return float(len(claims) / policies["exposure"].sum())
 
 
-
 def estimate_severity_parameters(claims: pd.DataFrame) -> tuple[float, float]:
-    """Schaetzt die Parameter einer Lognormal-Verteilung fuer die Schadenhoehe.
+    """Schätzt die Parameter einer Lognormal-Verteilung für die Schadenhöhe.
 
-    Mit X ~ Lognormal(μ, σ) ist ln X ~ N(μ, σ²). Die ML-Schaetzer sind daher
-    Mittelwert und Standardabweichung der logarithmierten Schadenhoehen, die
-    Standardabweichung mit Divisor n (ddof=0), wie beim ML-Schaetzer der
+    Mit X ~ Lognormal(μ, σ) ist ln X ~ N(μ, σ²). Die ML-Schätzer sind daher
+    Mittelwert und Standardabweichung der logarithmierten Schadenhöhen, die
+    Standardabweichung mit Divisor n (ddof=0), wie beim ML-Schätzer der
     Normalverteilung.
 
-    Bewusst nicht ``scipy.stats.lognorm.fit``: ohne ``floc=0`` schaetzt es
-    zusaetzlich eine Verschiebung loc, also ln(X - loc) ~ N(μ, σ²); μ und σ
-    gehoeren dann zu einer anderen Verteilung als der simulierten.
+    Bewusst nicht ``scipy.stats.lognorm.fit``: ohne ``floc=0`` schätzt es
+    zusätzlich eine Verschiebung loc, also ln(X - loc) ~ N(μ, σ²); μ und σ
+    gehören dann zu einer anderen Verteilung als der simulierten.
 
     Parameters
     ----------
@@ -61,7 +60,7 @@ def estimate_severity_parameters(claims: pd.DataFrame) -> tuple[float, float]:
     Returns
     -------
     (mu, sigma) : tuple[float, float]
-        ML-Schaetzer der Parameter von ln X ~ N(μ, σ²).
+        ML-Schätzer der Parameter von ln X ~ N(μ, σ²).
     """
     log_x = np.log(claims["claim_amount"].to_numpy())
     return float(log_x.mean()), float(log_x.std(ddof=0))
@@ -111,25 +110,23 @@ def calculate_statistics(simulations: np.ndarray) -> dict[str, float]:
     Parameters
     ----------
     simulations : np.ndarray
-        Array mit Gesamtschaeden aus monte_carlo_simulation()
+        Array mit Gesamtschäden aus monte_carlo_simulation()
 
     Returns
     -------
     dict
-        Dictionary mit Schluessel:
+        Dictionary mit Schlüssel:
         - "mean": Erwartungswert E[S]
         - "variance": Varianz Var[S]
-        - "std": Standardabweichung σ[S]
-        - "quantile_99": 99%-Quantil (Value-at-Risk)
+        - "std": Standardabweichung sd[S]
+        - "quantile_99": 99-%-Quantil (Value-at-Risk)
     """
-
-    my_dict = {}
-    my_dict["mean"] = np.mean(simulations)
-    my_dict["variance"] = np.var(simulations, ddof=0)
-    my_dict["std"] = np.std(simulations)
-    my_dict["quantile_99"] = np.quantile(simulations, 0.99)
-    return my_dict
-
+    return {
+        "mean": float(np.mean(simulations)),
+        "variance": float(np.var(simulations, ddof=0)),
+        "std": float(np.std(simulations, ddof=0)),
+        "quantile_99": float(np.quantile(simulations, 0.99)),
+    }
 
 
 def theoretical_statistics(
@@ -139,7 +136,7 @@ def theoretical_statistics(
 ) -> dict[str, float]:
     """Berechnet Erwartungswert und Varianz von S im kollektiven Modell.
 
-      - E[S] = E[N] * E[X] = λ * E[X]                        (Wald'sche Identitaet)
+      - E[S] = E[N] * E[X] = λ * E[X]                        (Wald'sche Identität)
       - Var[S] = E[N] * Var[X] + Var[N] * (E[X])^2           (Blackwell-Girshick)
              = λ * Var[X] + λ * (E[X])^2                     (Poisson: Var[N] = λ)
 
@@ -148,20 +145,15 @@ def theoretical_statistics(
     lambda_ : float
         Poisson-Parameter (E[N] = Var[N] = λ)
     severity_mean : float
-        Erwartungswert E[X] der Schadenhoehe
+        Erwartungswert E[X] der Schadenhöhe
     severity_variance : float
-        Varianz Var[X] der Schadenhoehe
+        Varianz Var[X] der Schadenhöhe
 
     Returns
     -------
     dict
-        Dictionary mit Schluessel: "mean", "variance", "std"
+        Dictionary mit Schlüssel: "mean", "variance", "std"
     """
     mean = lambda_ * severity_mean
-    variance = lambda_ * severity_variance + lambda_ * (severity_mean ** 2)
-    std = np.sqrt(variance)
-    my_dict = {}
-    my_dict["mean"] = mean
-    my_dict["variance"] = variance
-    my_dict["std"] = std
-    return my_dict
+    variance = lambda_ * severity_variance + lambda_ * severity_mean**2
+    return {"mean": mean, "variance": variance, "std": float(np.sqrt(variance))}
