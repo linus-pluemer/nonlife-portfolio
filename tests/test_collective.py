@@ -53,6 +53,14 @@ def test_severity_fit_recovers_lognormal_parameters(rng: np.random.Generator) ->
     assert sigma == pytest.approx(SIGMA, abs=0.02)
 
 
+def test_severity_fit_is_closed_form_mle() -> None:
+    # ln x = (0, 1, 2, 3): Mittel 1,5, Varianz mit Divisor n = 1,25.
+    amounts = np.exp([0.0, 1.0, 2.0, 3.0])
+    mu, sigma = estimate_severity_parameters(pd.DataFrame({"claim_amount": amounts}))
+    assert mu == pytest.approx(1.5, rel=1e-12)
+    assert sigma == pytest.approx(np.sqrt(1.25), rel=1e-12)
+
+
 # --- Monte Carlo -------------------------------------------------------------
 
 

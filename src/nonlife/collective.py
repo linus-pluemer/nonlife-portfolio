@@ -13,16 +13,17 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 
 def estimate_frequency_parameter(claims: pd.DataFrame, policies: pd.DataFrame) -> float:
-    """Schaetzt den Poisson-Parameter λ der Schadenfrequenz.
+    """Schaetzt die Schadenfrequenz je Exposure-Jahr.
 
     Die Frequenz wird definiert als:
-        λ = (Anzahl Schaeden) / (Summe Exposure)
+        (Anzahl Schaeden) / (Summe Exposure)
 
-    Dies ist die beobachtete durchschnittliche Schadenzahl pro Einheit Exposure.
+    Das ist der ML-Schaetzer der Poisson-Rate je Exposure-Jahr, nicht das λ
+    des Jahresgesamtschadens. Dieses entsteht erst durch Multiplikation mit
+    der Exposure eines Jahres (siehe ``cli._run_collective``).
 
     Parameters
     ----------
@@ -34,7 +35,7 @@ def estimate_frequency_parameter(claims: pd.DataFrame, policies: pd.DataFrame) -
     Returns
     -------
     float
-        Geschaetzter λ-Parameter
+        Geschaetzte Frequenz je Exposure-Jahr
     """
     return float(len(claims) / policies["exposure"].sum())
 
@@ -43,24 +44,27 @@ def estimate_frequency_parameter(claims: pd.DataFrame, policies: pd.DataFrame) -
 def estimate_severity_parameters(claims: pd.DataFrame) -> tuple[float, float]:
     """Schaetzt die Parameter einer Lognormal-Verteilung fuer die Schadenhoehe.
 
-    Die Funktion passt eine Lognormal-Verteilung an die beobachteten
-    claim_amounts an und gibt die Parameter μ und σ zurueck.
+    Mit X ~ Lognormal(μ, σ) ist ln X ~ N(μ, σ²). Die ML-Schaetzer sind daher
+    Mittelwert und Standardabweichung der logarithmierten Schadenhoehen, die
+    Standardabweichung mit Divisor n (ddof=0), wie beim ML-Schaetzer der
+    Normalverteilung.
+
+    Bewusst nicht ``scipy.stats.lognorm.fit``: ohne ``floc=0`` schaetzt es
+    zusaetzlich eine Verschiebung loc, also ln(X - loc) ~ N(μ, σ²); μ und σ
+    gehoeren dann zu einer anderen Verteilung als der simulierten.
 
     Parameters
     ----------
     claims : pd.DataFrame
-        DataFrame mit Spalte "claim_amount"
+        DataFrame mit Spalte "claim_amount", alle Werte > 0
 
     Returns
     -------
     (mu, sigma) : tuple[float, float]
-        Geschaetzte Parameter der Lognormal-Verteilung.
-        Hinweis: scipy.stats.lognorm.fit() gibt (s, loc, scale) zurueck,
-        wobei s=σ und scale=e^μ.
+        ML-Schaetzer der Parameter von ln X ~ N(μ, σ²).
     """
-    sigma, _loc, scale = stats.lognorm.fit(claims["claim_amount"])
-    mu =  np.log(scale)
-    return mu, sigma
+    log_x = np.log(claims["claim_amount"].to_numpy())
+    return float(log_x.mean()), float(log_x.std(ddof=0))
 
 
 def monte_carlo_simulation(
@@ -133,12 +137,11 @@ def theoretical_statistics(
     severity_mean: float,
     severity_variance: float,
 ) -> dict[str, float]:
-    """Berechnet die theoretischen Statistiken nach der Wald'schen Identitaet.
+    """Berechnet Erwartungswert und Varianz von S im kollektiven Modell.
 
-    Wald'sche Identitaet:
-      - E[S] = E[N] * E[X] = λ * E[X]
-      - Var[S] = E[N] * Var[X] + Var[N] * (E[X])^2
-             = λ * Var[X] + λ * (E[X])^2
+      - E[S] = E[N] * E[X] = λ * E[X]                        (Wald'sche Identitaet)
+      - Var[S] = E[N] * Var[X] + Var[N] * (E[X])^2           (Blackwell-Girshick)
+             = λ * Var[X] + λ * (E[X])^2                     (Poisson: Var[N] = λ)
 
     Parameters
     ----------
