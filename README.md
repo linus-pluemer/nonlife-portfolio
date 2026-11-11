@@ -14,11 +14,11 @@ Die Monte-Carlo-Verteilung der Jahresschadenlast trifft den theoretischen Erwart
 
 | | Simulation | Theorie |
 |---|---:|---:|
-| $E[S]$ | 2.542.947 | 2.542.015 |
-| $\mathrm{sd}[S]$ | 148.245 | 151.007 |
-| 99-%-Quantil | 2.895.916 | – |
+| $E[S]$ | 2.544.424 | 2.543.494 |
+| $\mathrm{sd}[S]$ | 147.344 | 150.101 |
+| 99-%-Quantil | 2.895.558 | – |
 
-Parameter: $\hat\lambda = 719{,}2$ Schäden je Jahr, Schwere Lognormal mit $\hat\mu = 7{,}7046$, $\hat\sigma = 0{,}9651$.
+Parameter: $\hat\lambda = 719{,}2$ Schäden je Jahr, Schwere Lognormal mit $\hat\mu = 7{,}7118$, $\hat\sigma = 0{,}9582$.
 
 ### Reserve: Chain-Ladder gegen wahre Reserve
 
@@ -48,7 +48,7 @@ Jahresgesamtschaden $S = X_1 + \dots + X_N$ mit $N \sim \text{Poisson}(\lambda)$
 
 $$E[S] = E[N]\,E[X], \qquad \mathrm{Var}[S] = E[N]\mathrm{Var}[X] + \mathrm{Var}[N]\,E[X]^2 = \lambda\,E[X^2].$$
 
-Das Portfolio ist heterogen: Police $i$ hat die Schadenanzahl $N_i \sim \text{Poisson}(\lambda_i)$ mit $\lambda_i = \lambda(x_i)\,e_i$. Die Summe unabhängiger zusammengesetzter Poisson-Variablen ist wieder zusammengesetzt Poisson mit $\lambda = \sum_i \lambda_i$ und der Mischung $\sum_i (\lambda_i/\lambda)\,F_i$ der Schwereverteilungen. Daher darf das Portfolio als ein kollektives Modell behandelt werden. Geschätzt wird $\hat\lambda$ als Schadenfrequenz je Exposure-Jahr mal mittlere Exposure eines Anfalljahres, $(\hat\mu, \hat\sigma)$ per Maximum-Likelihood aus allen Einzelschäden.
+Das Portfolio ist heterogen: Police $i$ hat die Schadenanzahl $N_i \sim \text{Poisson}(\lambda_i)$ mit $\lambda_i = \lambda(x_i)\,e_i$. Die Summe unabhängiger zusammengesetzter Poisson-Variablen ist wieder zusammengesetzt Poisson mit $\lambda = \sum_i \lambda_i$ und der Mischung $\sum_i (\lambda_i/\lambda)\,F_i$ der Schwereverteilungen. Daher darf das Portfolio als ein kollektives Modell behandelt werden. Geschätzt wird $\hat\lambda$ als Schadenfrequenz je Exposure-Jahr mal mittlere Exposure eines Anfalljahres, $(\hat\mu, \hat\sigma)$ per Maximum-Likelihood aus allen Einzelschäden, also Mittelwert und Standardabweichung (Divisor $n$) der logarithmierten Schadenhöhen.
 
 Die Monte-Carlo-Simulation ist vektorisiert: alle Schadenanzahlen in einem Aufruf, danach alle Schadenhöhen in einem Block, Summe je Lauf mit `np.bincount`. Zufall kommt ausschließlich aus einem übergebenen `numpy.random.Generator`.
 
