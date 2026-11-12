@@ -46,9 +46,9 @@ Das Gamma-GLM trifft die wahren Schwerefaktoren; alle sieben 95-%-Intervalle ent
 
 Jahresgesamtschaden $S = X_1 + \dots + X_N$ mit $N \sim \text{Poisson}(\lambda)$ und u.i.v. Schadenhöhen $X_k \sim \text{Lognormal}(\mu, \sigma^2)$, unabhängig von $N$. Dann gilt
 
-$$E[S] = E[N]\,E[X], \qquad \mathrm{Var}[S] = E[N]\mathrm{Var}[X] + \mathrm{Var}[N]\,E[X]^2 = \lambda\,E[X^2].$$
+$$E[S] = E[N]\thinspace E[X], \qquad \mathrm{Var}[S] = E[N]\mathrm{Var}[X] + \mathrm{Var}[N]\thinspace E[X]^2 = \lambda\thinspace E[X^2].$$
 
-Das Portfolio ist heterogen: Police $i$ hat die Schadenanzahl $N_i \sim \text{Poisson}(\lambda_i)$ mit $\lambda_i = \lambda(x_i)\,e_i$. Die Summe unabhängiger zusammengesetzter Poisson-Variablen ist wieder zusammengesetzt Poisson mit $\lambda = \sum_i \lambda_i$ und der Mischung $\sum_i (\lambda_i/\lambda)\,F_i$ der Schwereverteilungen. Daher darf das Portfolio als ein kollektives Modell behandelt werden. Geschätzt wird $\hat\lambda$ als Schadenfrequenz je Exposure-Jahr mal mittlere Exposure eines Anfalljahres, $(\hat\mu, \hat\sigma)$ per Maximum-Likelihood aus allen Einzelschäden, also Mittelwert und Standardabweichung (Divisor $n$) der logarithmierten Schadenhöhen.
+Das Portfolio ist heterogen: Police $i$ hat die Schadenanzahl $N_i \sim \text{Poisson}(\lambda_i)$ mit $\lambda_i = \lambda(x_i)\thinspace e_i$. Die Summe unabhängiger zusammengesetzter Poisson-Variablen ist wieder zusammengesetzt Poisson mit $\lambda = \sum_i \lambda_i$ und der Mischung $\sum_i (\lambda_i/\lambda)\thinspace F_i$ der Schwereverteilungen. Daher darf das Portfolio als ein kollektives Modell behandelt werden. Geschätzt wird $\hat\lambda$ als Schadenfrequenz je Exposure-Jahr mal mittlere Exposure eines Anfalljahres, $(\hat\mu, \hat\sigma)$ per Maximum-Likelihood aus allen Einzelschäden, also Mittelwert und Standardabweichung (Divisor $n$) der logarithmierten Schadenhöhen.
 
 Die Monte-Carlo-Simulation ist vektorisiert: alle Schadenanzahlen in einem Aufruf, danach alle Schadenhöhen in einem Block, Summe je Lauf mit `np.bincount`. Zufall kommt ausschließlich aus einem übergebenen `numpy.random.Generator`.
 
@@ -72,7 +72,7 @@ $$\log E[N_i] = \log e_i + \beta_0 + \sum_m \beta_{m, x_{im}}.$$
 
 Schwere: Gamma-GLM mit Log-Link auf den Einzelschäden, $\log E[X_k] = \gamma_0 + \sum_m \gamma_{m, x_{km}}$. Das Gamma-GLM unterstellt einen konstanten Variationskoeffizienten; das gilt für die simulierten lognormalen Schäden, sodass die Schätzer als Quasi-Likelihood-Schätzer konsistent sind. Die Dispersion wird über die Pearson-Statistik geschätzt.
 
-Kategoriale Merkmale gehen mit Treatment-Kodierung ein, die Designmatrix wird selbst gebaut, damit die Referenzklasse frei wählbar ist. Tariffaktoren sind $e^{\hat\beta}$, die Konfidenzintervalle $\exp(\hat\beta \pm z_{1-\alpha/2}\,\widehat{\mathrm{se}})$ (Wald-Intervall auf der Log-Skala, daher asymmetrisch um den Faktor). Zum Vergleich wird die einfache Auswertung je Merkmal $(N_\ell/E_\ell)/(N_\text{ref}/E_\text{ref})$ gezeigt; sie entspricht einem Poisson-GLM mit nur diesem Merkmal. Geschätzt wird mit `statsmodels`.
+Kategoriale Merkmale gehen mit Treatment-Kodierung ein, die Designmatrix wird selbst gebaut, damit die Referenzklasse frei wählbar ist. Tariffaktoren sind $e^{\hat\beta}$, die Konfidenzintervalle $\exp(\hat\beta \pm z_{1-\alpha/2}\thinspace \widehat{\mathrm{se}})$ (Wald-Intervall auf der Log-Skala, daher asymmetrisch um den Faktor). Zum Vergleich wird die einfache Auswertung je Merkmal $(N_\ell/E_\ell)/(N_\text{ref}/E_\text{ref})$ gezeigt; sie entspricht einem Poisson-GLM mit nur diesem Merkmal. Geschätzt wird mit `statsmodels`.
 
 ## Daten
 
