@@ -197,14 +197,12 @@ def plot_actual_vs_expected(
         ax.set_yticks(y, [str(level) for level in table.index], fontsize=8)
         ax.set_xlim(lo - 0.05, hi + 0.05)
 
-    fig, _ = _feature_panels(
-        {f: len(t) for f, t in tables.items()}, columns, draw,
-        f"Ist / Soll auf den Testdaten, Balken ± {z:g}/√Soll",
-    )
+    fig, _ = _feature_panels({f: len(t) for f, t in tables.items()}, columns, draw, "Ist / Soll")
+    z_text = f"{z:g}".replace(".", ",")
     fig.legend(
         handles=[
             Line2D([], [], color=SERIES_1, marker="o", markersize=4,
-                   label="Ist / Soll je Klasse mit Zufallsstreuung"),
+                   label=f"Ist / Soll je Klasse (Testdaten), Balken ± {z_text}/√Soll"),
             Line2D([], [], color=SERIES_2, linewidth=1.2, label="Ist = Soll (Vorhersage trifft)"),
         ],
         loc="upper left", bbox_to_anchor=(0.08, 1.0), ncol=2, frameon=False, fontsize=9,

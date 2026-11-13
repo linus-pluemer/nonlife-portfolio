@@ -55,7 +55,7 @@ Die Devianz misst, wie weit die vorhergesagten von den tatsächlichen Schadenzah
 
 ![Ist gegen Soll je Klasse auf den Testdaten](reports/figures/fremtpl2_actual_vs_expected.png)
 
-*So liest man die Grafik:* Jeder Punkt ist eine Klasse eines Merkmals, etwa die Fahrer von 18 bis 20 Jahren. Sein Wert ist die Zahl der Schäden, die diese Policen in den Testdaten tatsächlich hatten (Ist), geteilt durch die Zahl, die das GLM für sie vorhersagt (Soll). Der rote Strich bei 1 heißt Ist = Soll: Die Vorhersage trifft. Rechts davon gab es mehr Schäden als vorhergesagt, links weniger. Der Balken zeigt, wie weit das Verhältnis allein durch Zufall schwankt, wenn das Modell stimmt (±1,96/√Soll, also breit bei kleinen Klassen wie R43). Schneidet der Balken den Strich, ist die Abweichung mit Zufall vereinbar.
+Ist ist die tatsächliche Zahl der Schäden einer Klasse in den Testdaten, Soll die Vorhersage des GLM für dieselben Policen. Der Balken zeigt, wie weit das Verhältnis allein durch Zufall schwankt, wenn das Modell stimmt (±1,96/√Soll, also breit bei kleinen Klassen wie R43). Schneidet der Balken den Strich bei 1, ist die Abweichung mit Zufall vereinbar.
 
 Insgesamt gab es auf den Testdaten 2.619 Schäden bei 2.618,0 vorhergesagten. Je Klasse schneiden 59 der 65 Balken den Strich, 6 nicht. Die Balken unterstellen aber reine Poisson-Streuung, und die Daten streuen stärker: Der Schätzer der Dispersion (Verhältnis von beobachteter zu Poisson-Varianz) ist $\hat\phi = 1{,}71$. Verbreitert man die Balken entsprechend um den Faktor $\sqrt{1{,}71} \approx 1{,}31$, bleibt nur die Region R23 (Ist 34, Soll 20,8) außerhalb. Bei 65 Klassen wären etwa drei zufällige Ausreißer zu erwarten.
 
@@ -95,7 +95,7 @@ summiert über alle Anfalljahre $i$, für die beide Werte beobachtet sind. Ist $
 
 $$\hat C_{i,J} = C_{i,I-i} \prod_{j \ge I-i} \hat f_j, \qquad \hat R_i = \hat C_{i,J} - C_{i,I-i}.$$
 
-Die wahre Reserve je Anfalljahr ist der simulierte Endschaden minus die bis zum Stichtag gezahlten Beträge. Die Chain-Ladder-Funktionen sind gegen das Paket [`chainladder`](https://github.com/casact/chainladder-python) auf dem RAA-Dreieck aus Mack (1993) getestet; das Paket wird nur in den Tests verwendet.
+Die wahre Reserve je Anfalljahr ist der simulierte Endschaden minus die bis zum Stichtag gezahlten Beträge. Die Chain-Ladder-Funktionen sind gegen das Paket [`chainladder`](https://github.com/casact/chainladder-python) auf dem RAA-Dreieck getestet (Schadendaten der Reinsurance Association of America, 1991, ein Standardbeispiel u. a. bei Mack 1994); das Paket wird nur in den Tests verwendet.
 
 ### Tarifierung ([`pricing.py`](src/nonlife/pricing.py))
 
