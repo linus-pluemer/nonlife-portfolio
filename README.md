@@ -49,33 +49,49 @@ Zahlen und Grafik aus `nonlife fremtpl2 --seed 42`, vollständig in [`reports/fr
 | Nullmodell (eine Frequenz für alle) | 25,2614 | 25,0110 |
 | GLM, 9 Merkmale, 57 Parameter | 23,7987 | 23,5531 |
 
-Das GLM senkt die Testdevianz um 5,83 % gegenüber dem Nullmodell. Das wirkt wenig, ist aber typisch: Bei einer Frequenz um 7 % ist der größte Teil der Streuung reiner Zufall, den kein Merkmal erklären kann.
+Die Devianz misst, wie weit die vorhergesagten von den tatsächlichen Schadenzahlen entfernt sind; kleiner ist besser (Formel unter [Methodik](#bewertung-auf-echten-daten-evaluationpy)). Das GLM senkt sie auf den Testdaten um 5,83 % gegenüber dem Nullmodell. Das wirkt wenig, ist aber typisch: Bei einer Frequenz um 7 % ist der größte Teil der Streuung reiner Zufall, ob eine einzelne Police einen Schaden hat oder nicht, und den kann kein Merkmal erklären.
+
+**Trifft das Modell jede Klasse?**
 
 ![Ist gegen Soll je Klasse auf den Testdaten](reports/figures/fremtpl2_actual_vs_expected.png)
 
-Auf den Testdaten liegen beobachtete und vorhergesagte Schadenzahl insgesamt bei 2.619 gegen 2.618,0. Die Balken zeigen die reine Poisson-Streuung ±1,96/√Soll; mit ihr liegen 6 der 65 Klassen außerhalb. Die Daten sind aber überdispers: Der Pearson-Schätzer auf den Trainingsdaten ist $\hat\phi = 1{,}71$. Mit um $\sqrt{\hat\phi}$ verbreiterten Bändern bleibt nur die Region R23 (Ist 34, Soll 20,8) außerhalb; bei 65 Klassen wären etwa drei zufällige Ausreißer zu erwarten. Aus demselben Grund sind die Konfidenzintervalle der Faktoren mit $\phi = 1$ um den Faktor $\sqrt{1{,}71} \approx 1{,}31$ zu schmal (siehe [Grenzen](#grenzen)).
+*So liest man die Grafik:* Jeder Punkt ist eine Klasse eines Merkmals, etwa die Fahrer von 18 bis 20 Jahren. Sein Wert ist die Zahl der Schäden, die diese Policen in den Testdaten tatsächlich hatten (Ist), geteilt durch die Zahl, die das GLM für sie vorhersagt (Soll). Der rote Strich bei 1 heißt Ist = Soll: Die Vorhersage trifft. Rechts davon gab es mehr Schäden als vorhergesagt, links weniger. Der Balken zeigt, wie weit das Verhältnis allein durch Zufall schwankt, wenn das Modell stimmt (±1,96/√Soll, also breit bei kleinen Klassen wie R43). Schneidet der Balken den Strich, ist die Abweichung mit Zufall vereinbar.
 
-Das stärkste Merkmal ist der Bonus-Malus. Neben seiner Höhe trägt das selbst gebildete Merkmal `bm_off_ladder` (Wert liegt nicht auf der Stufenleiter schadenfreier Jahre, also nach einem Schaden) einen Faktor von 2,19 [2,10; 2,29] bei gleicher Höhe.
+Insgesamt gab es auf den Testdaten 2.619 Schäden bei 2.618,0 vorhergesagten. Je Klasse schneiden 59 der 65 Balken den Strich, 6 nicht. Die Balken unterstellen aber reine Poisson-Streuung, und die Daten streuen stärker: Der Schätzer der Dispersion (Verhältnis von beobachteter zu Poisson-Varianz) ist $\hat\phi = 1{,}71$. Verbreitert man die Balken entsprechend um den Faktor $\sqrt{1{,}71} \approx 1{,}31$, bleibt nur die Region R23 (Ist 34, Soll 20,8) außerhalb. Bei 65 Klassen wären etwa drei zufällige Ausreißer zu erwarten.
+
+**Wie sehen die geschätzten Faktoren aus?**
+
+![Geschätzte Frequenzfaktoren auf freMTPL2](reports/figures/fremtpl2_relativities.png)
+
+*So liest man die Grafik:* Blau ist der Faktor des GLM, mit dem die Frequenz einer Klasse gegenüber der Referenzklasse (Faktor 1, die Klasse mit der meisten Exposure) multipliziert wird, mit 95-%-Konfidenzintervall. Grün ist die einfache Auswertung je Merkmal, also die beobachtete Frequenz der Klasse geteilt durch die der Referenzklasse, ohne die übrigen Merkmale zu berücksichtigen. Die Achse ist logarithmisch, weil Faktoren multiplikativ wirken. Wahre Faktoren gibt es nicht; die Faktoren werden deshalb auf fachliche Plausibilität geprüft. Die Intervalle rechnen mit $\phi = 1$ und sind um den Faktor 1,31 zu schmal (siehe [Grenzen](#grenzen)).
+
+- **Bonus-Malus** ist das stärkste Merkmal: Die Frequenz steigt mit der Höhe bis zum Faktor 3,44 (91–100 gegen 50). Das selbst gebildete Merkmal `bm_off_ladder` (Wert liegt neben der Stufenleiter schadenfreier Jahre, also steckt ein früherer Schaden darin) trägt bei gleicher Höhe einen weiteren Faktor 2,19 [2,10; 2,29]. Die Klasse 101+ liegt nur scheinbar unter 91–100: Werte über 100 liegen immer neben der Leiter, zusammen also 3,23 · 2,19 ≈ 7,1.
+- **Fahreralter** zeigt die Konfundierung am deutlichsten: Einfach ausgewertet haben 18- bis 20-Jährige die 3,6-fache Frequenz, im GLM nur die 1,45-fache. Junge Fahrer haben zwangsläufig einen hohen Bonus-Malus, weil sie die Leiter noch nicht hinabsteigen konnten. Die einfache Auswertung schreibt dem Alter zu, was zum großen Teil der Bonus-Malus erklärt.
+- **Wohnort** (`area`, nach Bevölkerungsdichte von A bis F): Die Frequenz steigt mit der Dichte, im GLM von 0,85 (A) bis 1,30 (F) gegenüber C.
 
 ## Methodik
 
+**Bezeichnungen, die in allen Teilen gelten.** Eine Police heißt $i$. Sie hat die Exposure $e_i$ (versicherte Zeit in Jahren, höchstens 1), die Schadenzahl $N_i$ im Beobachtungsjahr und die Tarifmerkmale $x_i$ (etwa Altersklasse und Region). $\lambda(x)$ ist die Schadenfrequenz einer Police mit den Merkmalen $x$, also die erwartete Zahl der Schäden je Versicherungsjahr; Police $i$ erwartet damit $\mu_i = e_i\thinspace\lambda(x_i)$ Schäden. $X_k$ ist die Höhe des Schadens $k$. Ein Dach wie in $\hat\lambda$ kennzeichnet einen Schätzwert.
+
 ### Kollektives Modell ([`collective.py`](src/nonlife/collective.py))
 
-Jahresgesamtschaden $S = X_1 + \dots + X_N$ mit $N \sim \text{Poisson}(\lambda)$ und u.i.v. Schadenhöhen $X_k \sim \text{Lognormal}(\mu, \sigma^2)$, unabhängig von $N$. Dann gilt
+Der Jahresgesamtschaden des Portfolios ist $S = X_1 + \dots + X_N$. Dabei ist $N \sim \text{Poisson}(\lambda)$ die Zahl aller Schäden im Jahr mit Erwartungswert $\lambda$, und die Schadenhöhen $X_k$ sind unabhängig, identisch verteilt und unabhängig von $N$, mit $\log X_k \sim \mathcal{N}(\mu, \sigma^2)$ (Lognormalverteilung mit den Parametern $\mu$ und $\sigma$). Dann gilt
 
-$$E[S] = E[N]\thinspace E[X], \qquad \mathrm{Var}[S] = E[N]\mathrm{Var}[X] + \mathrm{Var}[N]\thinspace E[X]^2 = \lambda\thinspace E[X^2].$$
+$$E[S] = E[N]\thinspace E[X], \qquad \mathrm{Var}[S] = E[N]\mathrm{Var}[X] + \mathrm{Var}[N]\thinspace E[X]^2 = \lambda\thinspace E[X^2],$$
 
-Das Portfolio ist heterogen: Police $i$ hat die Schadenanzahl $N_i \sim \text{Poisson}(\lambda_i)$ mit $\lambda_i = \lambda(x_i)\thinspace e_i$. Die Summe unabhängiger zusammengesetzter Poisson-Variablen ist wieder zusammengesetzt Poisson mit $\lambda = \sum_i \lambda_i$ und der Mischung $\sum_i (\lambda_i/\lambda)\thinspace F_i$ der Schwereverteilungen. Daher darf das Portfolio als ein kollektives Modell behandelt werden. Geschätzt wird $\hat\lambda$ als Schadenfrequenz je Exposure-Jahr mal mittlere Exposure eines Anfalljahres, $(\hat\mu, \hat\sigma)$ per Maximum-Likelihood aus allen Einzelschäden, also Mittelwert und Standardabweichung (Divisor $n$) der logarithmierten Schadenhöhen.
+wobei $X$ für eine einzelne Schadenhöhe steht; die zweite Gleichung nutzt $\mathrm{Var}[N] = E[N] = \lambda$.
+
+Das Portfolio ist heterogen: Police $i$ hat die Schadenzahl $N_i \sim \text{Poisson}(\lambda_i)$ mit $\lambda_i = \lambda(x_i)\thinspace e_i$ und eine eigene Schwereverteilung $F_i$. Die Summe unabhängiger zusammengesetzter Poisson-Variablen ist wieder zusammengesetzt Poisson mit $\lambda = \sum_i \lambda_i$ und der Mischung $\sum_i (\lambda_i/\lambda)\thinspace F_i$ als Schwereverteilung. Daher darf das Portfolio als ein kollektives Modell behandelt werden. Geschätzt wird $\hat\lambda$ als Schadenfrequenz je Exposure-Jahr mal mittlere Exposure eines Anfalljahres, $(\hat\mu, \hat\sigma)$ per Maximum-Likelihood aus allen Einzelschäden, also Mittelwert und Standardabweichung (Divisor: Zahl der Schäden) der logarithmierten Schadenhöhen.
 
 Die Monte-Carlo-Simulation ist vektorisiert: alle Schadenanzahlen in einem Aufruf, danach alle Schadenhöhen in einem Block, Summe je Lauf mit `np.bincount`. Zufall kommt ausschließlich aus einem übergebenen `numpy.random.Generator`.
 
 ### Reservierung ([`reserving.py`](src/nonlife/reserving.py))
 
-Kumuliertes Zahlungsdreieck $C_{i,j}$ (Anfalljahr $i$, Abwicklungsjahr $j$) aus den Einzelzahlungen bis zum Stichtag. Volumengewichtete Entwicklungsfaktoren
+Aus den Einzelzahlungen bis zum Stichtag entsteht das kumulierte Zahlungsdreieck: $C_{i,j}$ ist die Summe aller Zahlungen für Schäden des Anfalljahres $i$ bis zum Ende des Abwicklungsjahres $j$ ($j = 0$ ist das Anfalljahr selbst). Der Entwicklungsfaktor von Abwicklungsjahr $j$ nach $j+1$ wird volumengewichtet geschätzt,
 
 $$\hat f_j = \frac{\sum_i C_{i,j+1}}{\sum_i C_{i,j}},$$
 
-summiert über alle Anfalljahre, für die beide Werte beobachtet sind. Mit dem Stichtag $I$ ist $C_{i,I-i}$ der letzte beobachtete Wert des Anfalljahres $i$. Hochrechnung und Reserve:
+summiert über alle Anfalljahre $i$, für die beide Werte beobachtet sind. Ist $I$ das Jahr des Stichtags, dann ist $C_{i,I-i}$ der letzte beobachtete Wert des Anfalljahres $i$ (die Diagonale des Dreiecks). Mit $J$ als letztem Abwicklungsjahr (hier $J = 9$) sind der geschätzte Endschaden $\hat C_{i,J}$ und die Reserve $\hat R_i$
 
 $$\hat C_{i,J} = C_{i,I-i} \prod_{j \ge I-i} \hat f_j, \qquad \hat R_i = \hat C_{i,J} - C_{i,I-i}.$$
 
@@ -83,21 +99,31 @@ Die wahre Reserve je Anfalljahr ist der simulierte Endschaden minus die bis zum 
 
 ### Tarifierung ([`pricing.py`](src/nonlife/pricing.py))
 
-Frequenz: Poisson-GLM mit Log-Link und $\log e_i$ als Offset (Koeffizient fest 1, da $E[N_i]$ proportional zur Exposure),
+Jedes Merkmal $m$ (etwa Region) hat endlich viele Klassen $\ell$ (etwa Stadt, Land); $x_{im}$ ist die Klasse von Police $i$ im Merkmal $m$. Je Merkmal ist eine Klasse die Referenz. Die Frequenz wird mit einem Poisson-GLM mit Log-Link geschätzt:
 
 $$\log E[N_i] = \log e_i + \beta_0 + \sum_m \beta_{m, x_{im}}.$$
 
-Schwere: Gamma-GLM mit Log-Link auf den Einzelschäden, $\log E[X_k] = \gamma_0 + \sum_m \gamma_{m, x_{km}}$. Das Gamma-GLM unterstellt einen konstanten Variationskoeffizienten; das gilt für die simulierten lognormalen Schäden, sodass die Schätzer als Quasi-Likelihood-Schätzer konsistent sind. Die Dispersion wird über die Pearson-Statistik geschätzt.
+Dabei ist $\beta_0$ die logarithmierte Frequenz einer Police, die in jedem Merkmal in der Referenzklasse liegt, und $\beta_{m,\ell}$ der Zuschlag der Klasse $\ell$ im Merkmal $m$ auf der Log-Skala ($\beta_{m,\ell} = 0$ für die Referenzklasse). $\log e_i$ ist ein Offset: ein Summand mit festem Koeffizienten 1, weil $E[N_i]$ proportional zur Exposure ist (doppelte versicherte Zeit, doppelt so viele erwartete Schäden). Der Tariffaktor der Klasse ist $e^{\hat\beta_{m,\ell}}$; mit ihm wird die Frequenz gegenüber der Referenzklasse multipliziert.
 
-Kategoriale Merkmale gehen mit Treatment-Kodierung ein, die Designmatrix wird selbst gebaut, damit die Referenzklasse frei wählbar ist. Tariffaktoren sind $e^{\hat\beta}$, die Konfidenzintervalle $\exp(\hat\beta \pm z_{1-\alpha/2}\thinspace \widehat{\mathrm{se}})$ (Wald-Intervall auf der Log-Skala, daher asymmetrisch um den Faktor). Zum Vergleich wird die einfache Auswertung je Merkmal $(N_\ell/E_\ell)/(N_\text{ref}/E_\text{ref})$ gezeigt; sie entspricht einem Poisson-GLM mit nur diesem Merkmal. Geschätzt wird mit `statsmodels`.
+Die Schwere wird mit einem Gamma-GLM mit Log-Link auf den Einzelschäden geschätzt, $\log E[X_k] = \gamma_0 + \sum_m \gamma_{m, x_{km}}$, wobei $x_{km}$ die Klasse der Police ist, zu der Schaden $k$ gehört, und $\gamma$ die Koeffizienten wie oben. Das Gamma-GLM unterstellt $\mathrm{Var}[X_k] = \phi\thinspace E[X_k]^2$, also einen konstanten Variationskoeffizienten $\sqrt\phi$. Das gilt für die simulierten lognormalen Schäden, sodass die Schätzer als Quasi-Likelihood-Schätzer konsistent sind. Die Dispersion $\phi$ wird über die Pearson-Statistik geschätzt.
+
+Die Designmatrix (eine Zeile je Police, eine Spalte je Koeffizient: Einsen für $\beta_0$, sonst 0/1 für „Police liegt in Klasse $\ell$“) wird selbst gebaut, damit die Referenzklasse frei wählbar ist. Das Konfidenzintervall eines Faktors ist $\exp(\hat\beta \pm z_{1-\alpha/2}\thinspace \widehat{\mathrm{se}})$ mit dem Standardfehler $\widehat{\mathrm{se}}$ von $\hat\beta$ und dem Quantil $z_{1-\alpha/2}$ der Standardnormalverteilung (1,96 für 95 %). Es ist symmetrisch auf der Log-Skala und deshalb asymmetrisch um den Faktor. Zum Vergleich wird die einfache Auswertung je Merkmal $(N_\ell/E_\ell)/(N_\text{ref}/E_\text{ref})$ gezeigt, mit $N_\ell$ und $E_\ell$ als Summe der Schäden und der Exposure aller Policen der Klasse $\ell$; sie entspricht einem Poisson-GLM mit nur diesem Merkmal. Geschätzt wird mit `statsmodels`.
 
 ### Bewertung auf echten Daten ([`evaluation.py`](src/nonlife/evaluation.py))
 
-Ohne wahre Parameter zählt die Vorhersage auf Policen, die das Modell nicht gesehen hat. Die Policen werden 90/10 in Trainings- und Testdaten geteilt, und zwar gruppenweise: Policen mit identischen Merkmalen bilden eine Gruppe und landen gemeinsam auf einer Seite (Begründung unter [Daten](#daten)). Referenz je Merkmal ist die Klasse mit der größten Exposure im Training. Maß ist die mittlere Poisson-Devianz auf den Testdaten,
+Ohne wahre Parameter zählt die Vorhersage auf Policen, die das Modell nicht gesehen hat. Die Policen werden 90/10 in Trainings- und Testdaten geteilt, und zwar gruppenweise: Policen mit identischen Merkmalen bilden eine Gruppe und landen gemeinsam auf einer Seite (Begründung unter [Daten](#daten)). Geschätzt wird nur auf den Trainingsdaten; Referenz je Merkmal ist dort die Klasse mit der größten Exposure. Für jede der $n$ Policen der Testdaten sagt das GLM dann $\hat\mu_i = e_i\thinspace\hat\lambda(x_i)$ Schäden voraus. Maß ist die mittlere Poisson-Devianz
 
-$$D = \frac{1}{n} \sum_i 2 \left[ N_i \log \frac{N_i}{\hat\mu_i} - (N_i - \hat\mu_i) \right], \qquad \hat\mu_i = e_i \thinspace \hat\lambda(x_i), \quad 0 \cdot \log 0 = 0,$$
+$$D = \frac{1}{n} \sum_{i=1}^{n} 2 \left[ N_i \log \frac{N_i}{\hat\mu_i} - (N_i - \hat\mu_i) \right], \qquad 0 \cdot \log 0 = 0.$$
 
-also das Kriterium, das das GLM beim Schätzen minimiert, ausgewertet auf neuen Daten. Vergleich ist das Nullmodell mit einer gemeinsamen Frequenz. Je Klasse wird $\sum N_i$ gegen $\sum \hat\mu_i$ verglichen; auf den Trainingsdaten sind beide nach der Score-Gleichung $X^\top (N - \hat\mu) = 0$ für jede Klasse im Modell gleich, aussagekräftig ist der Vergleich daher nur auf den Testdaten. Die Poisson-Annahme $\mathrm{Var}[N] = E[N]$ wird mit dem Pearson-Schätzer $\hat\phi = \frac{1}{n-p} \sum_i (N_i - \hat\mu_i)^2 / \hat\mu_i$ geprüft.
+Jeder Summand ist 0, wenn $\hat\mu_i = N_i$, und wächst, je weiter Vorhersage und Beobachtung auseinanderliegen; für eine Police ohne Schaden ist er $2\hat\mu_i$. $D$ ist das Doppelte der mittleren Differenz der Log-Likelihood zwischen einem Modell, das jede Police genau trifft, und dem geschätzten Modell. Es ist also das Kriterium, das das GLM beim Schätzen minimiert, ausgewertet auf neuen Daten. Vergleich ist das Nullmodell, das allen Policen dieselbe Frequenz gibt.
+
+Je Klasse eines Merkmals wird die Summe der beobachteten Schäden $\sum N_i$ (Ist) mit der Summe der vorhergesagten $\sum \hat\mu_i$ (Soll) verglichen, summiert über die Policen der Klasse. Auf den Trainingsdaten sind beide für jede Klasse im Modell exakt gleich: Das besagt die Score-Gleichung des Poisson-GLM, $X^\top (N - \hat\mu) = 0$, mit der Designmatrix $X$ und den Vektoren $N$ und $\hat\mu$ aller Policen; jede Spalte von $X$ markiert eine Klasse. Aussagekräftig ist der Vergleich daher nur auf den Testdaten.
+
+Die Poisson-Annahme $\mathrm{Var}[N_i] = E[N_i]$ wird mit dem Pearson-Schätzer der Dispersion geprüft,
+
+$$\hat\phi = \frac{1}{n-p} \sum_{i=1}^{n} \frac{(N_i - \hat\mu_i)^2}{\hat\mu_i},$$
+
+hier auf den $n$ Policen der Trainingsdaten mit $p$ geschätzten Koeffizienten. Jeder Summand vergleicht die beobachtete quadrierte Abweichung mit der Poisson-Varianz $\hat\mu_i$. Unter der Poisson-Annahme ist $\phi = 1$; $\hat\phi > 1$ heißt Überdispersion, die Daten streuen stärker als Poisson.
 
 ## Daten
 
