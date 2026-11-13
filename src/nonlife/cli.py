@@ -273,7 +273,25 @@ def run_fremtpl2(args: argparse.Namespace) -> None:
                       args.figures_dir / "fremtpl2_actual_vs_expected.png")
     print(f"\n  Grafik: {path}")
 
-    rel = pricing.relativities(glm)
+    # Faktoren in der natürlichen Reihenfolge der Klassen; einfache Auswertung auf dem Training
+    order = [(f, lvl) for f in features for lvl in train[f].astype("category").cat.categories
+             if lvl in glm.levels[f]]
+    rel = pricing.relativities(glm).reindex(order)
+    by_class = {f: train.groupby(f, observed=True)[["n_claims", "exposure"]].sum()
+                for f in features}
+    one_way = {
+        (f, str(lvl)): float(
+            (t.loc[lvl, "n_claims"] / t.loc[lvl, "exposure"])
+            / (t.loc[reference[f], "n_claims"] / t.loc[reference[f], "exposure"])
+        )
+        for f, t in by_class.items() for lvl in t.index
+    }
+    path = plots.save(
+        plots.plot_relativity_panels(rel, columns, one_way,
+                                     interval_note=" (mit φ = 1, zu schmal)"),
+        args.figures_dir / "fremtpl2_relativities.png",
+    )
+    print(f"  Grafik: {path}")
     results = {
         "seed": args.seed,
         "test_share": args.test_share,
@@ -288,7 +306,8 @@ def run_fremtpl2(args: argparse.Namespace) -> None:
         "n_params": n_params,
         "pearson_dispersion": phi,
         "relativities": [
-            {"feature": f, "level": str(lvl), **{k: float(v) for k, v in row.items()}}
+            {"feature": f, "level": str(lvl), **{k: float(v) for k, v in row.items()},
+             "one_way": one_way[(f, str(lvl))]}
             for (f, lvl), row in rel.iterrows()
         ],
         "actual_vs_expected": {
