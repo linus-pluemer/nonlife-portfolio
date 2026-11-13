@@ -23,7 +23,9 @@ from nonlife.pricing import (
     fit_frequency_glm,
     fit_severity_glm,
     frequency_table,
+    largest_exposure_levels,
     one_way_relativities,
+    predict_frequency,
     relativities,
     severity_table,
 )
@@ -169,6 +171,47 @@ def test_severity_table_one_row_per_claim(
     assert len(table) == len(claims)
     assert table["region"].tolist() == ["Land", "Land", "Stadt"]
     assert not table.isna().any().any()
+
+
+def test_severity_table_rejects_claim_without_policy(
+    small_tables: tuple[pd.DataFrame, pd.DataFrame],
+) -> None:
+    policies, claims = small_tables
+    claims.loc[2, "policy_id"] = 99
+    with pytest.raises(ValueError, match="1 Schäden ohne Police, policy_id: 99"):
+        severity_table(policies, claims)
+
+
+def test_largest_exposure_levels() -> None:
+    data = pd.DataFrame({"region": ["Land", "Stadt", "Stadt"], "exposure": [1.0, 0.4, 0.4]})
+    assert largest_exposure_levels(data, ["region"]) == {"region": "Land"}
+
+
+# --- Vorhersage --------------------------------------------------------------
+
+
+def test_prediction_on_training_data_equals_fitted_values(rng: np.random.Generator) -> None:
+    data = _frequency_data(rng, 5_000)
+    model = fit_frequency_glm(data, ["region"], reference={"region": "Stadt"})
+    assert predict_frequency(model, data) == pytest.approx(
+        model.result.fittedvalues.to_numpy(), rel=1e-10
+    )
+
+
+def test_prediction_independent_of_row_order_and_levels(rng: np.random.Generator) -> None:
+    # Testdaten mit nur einer Ausprägung: Die Spalten kommen aus dem Modell, nicht aus den Daten.
+    data = _frequency_data(rng, 5_000)
+    model = fit_frequency_glm(data, ["region"])
+    city = data[data["region"] == "Stadt"].iloc[::-1]
+    full = pd.Series(predict_frequency(model, data), index=data.index)
+    assert predict_frequency(model, city) == pytest.approx(full[city.index].to_numpy(), rel=1e-12)
+
+
+def test_prediction_rejects_unknown_level(rng: np.random.Generator) -> None:
+    data = _frequency_data(rng, 500)
+    model = fit_frequency_glm(data, ["region"])
+    with pytest.raises(ValueError, match="unbekannte Ausprägungen"):
+        predict_frequency(model, data.assign(region="Mond"))
 
 
 # --- gegen wahre Faktoren ----------------------------------------------------
