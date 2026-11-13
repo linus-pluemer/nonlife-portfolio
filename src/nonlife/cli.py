@@ -193,6 +193,115 @@ def run(args: argparse.Namespace) -> None:
     print(f"\nKennzahlen: {out}")
 
 
+def run_fremtpl2(args: argparse.Namespace) -> None:
+    """Frequenz-GLM auf freMTPL2: bereinigen, gruppenweise aufteilen, auf Testdaten bewerten."""
+    from nonlife import evaluation, fremtpl2  # fremtpl2 braucht das Extra erst beim Laden
+
+    policies, _, report = fremtpl2.clean_fremtpl2(*fremtpl2.fetch_fremtpl2(args.cache_dir))
+    print("[Bereinigung]")
+    for key, value in vars(report).items():
+        print(f"  {key:<32}{value:>10,}".replace(",", "."))
+
+    features = list(fremtpl2.TARIFF_FEATURES)
+    data = policies[["policy_id", "n_claims", "exposure"]].join(
+        fremtpl2.tariff_features(policies)
+    )
+    groups = fremtpl2.duplicate_groups(policies)
+    is_test = evaluation.group_split(groups, args.test_share, np.random.default_rng(args.seed))
+    train, test = data[~is_test], data[is_test]
+    print(f"\n[Aufteilung] {_de_amount(groups.nunique())} Gruppen; "
+          f"Training {_de_amount(len(train))} Policen, Test {_de_amount(len(test))} "
+          f"({len(test) / len(data):.1%})")
+    # Hinweise auf doppelt erfasste Verträge: Paare mit Exposure-Summe ≤ 1 und nahen Nummern
+    size = groups.map(groups.value_counts())
+    pairs = policies[(size == 2).to_numpy()].groupby(groups[size == 2])
+    pair_exposure = pairs["exposure"].sum()
+    pair_id_gap = pairs["policy_id"].max() - pairs["policy_id"].min()
+    duplicates = {
+        "share_with_twin": float((size >= 2).mean()),
+        "pairs": len(pair_exposure),
+        "pairs_exposure_at_most_one": float((pair_exposure <= 1 + 1e-9).mean()),
+        "pairs_median_id_gap": float(pair_id_gap.median()),
+    }
+    print(f"  Policen mit Zwilling (gleiche Merkmale): {duplicates['share_with_twin']:.1%}; "
+          f"Paare: Exposure-Summe ≤ 1 bei {duplicates['pairs_exposure_at_most_one']:.1%}, "
+          f"Median Abstand IDpol {duplicates['pairs_median_id_gap']:.0f}")
+
+    reference = pricing.largest_exposure_levels(train, features)
+    glm = pricing.fit_frequency_glm(train, features, reference)
+    null = pricing.fit_frequency_glm(train, [])
+    mu = {
+        (name, part): pricing.predict_frequency(model, frame)
+        for name, model in (("glm", glm), ("null", null))
+        for part, frame in (("train", train), ("test", test))
+    }
+    deviance = {
+        name: {part: evaluation.poisson_deviance(frame["n_claims"], mu[(name, part)])
+               for part, frame in (("train", train), ("test", test))}
+        for name in ("glm", "null")
+    }
+    n_params = len(glm.result.params)
+    phi = evaluation.pearson_dispersion(train["n_claims"], mu[("glm", "train")], n_params)
+
+    print("\n[Poisson-Devianz je Police, in 10⁻²]")
+    print(f"  {'':<12}{'Training':>10}{'Test':>10}")
+    for name, label in (("null", "Nullmodell"), ("glm", "GLM")):
+        print(f"  {label:<12}{100 * deviance[name]['train']:>10.4f}"
+              f"{100 * deviance[name]['test']:>10.4f}")
+    gain = 1 - deviance["glm"]["test"] / deviance["null"]["test"]
+    print(f"  GLM senkt die Testdevianz um {gain:.2%} gegenüber dem Nullmodell")
+    print(f"  {n_params} Parameter, Pearson-φ̂ (Training) = {phi:.4f}")
+
+    tables = {f: evaluation.actual_vs_expected(test, mu[("glm", "test")], f) for f in features}
+    # Klassen, deren Ist/Soll außerhalb von 1 ± 1,96·√φ/√Soll liegt, mit φ = 1 und φ = φ̂
+    deviation = pd.concat(
+        [(t["ratio"] - 1).abs() * np.sqrt(t["expected"]) for t in tables.values()],
+        keys=list(tables),
+    )
+    outside_1 = [f"{f}: {lvl}" for (f, lvl), d in deviation.items() if d > 1.96]
+    outside_phi = [f"{f}: {lvl}" for (f, lvl), d in deviation.items() if d > 1.96 * np.sqrt(phi)]
+    outside = {"classes": len(deviation), "phi_1": outside_1, "phi_hat": outside_phi}
+    total_actual = float(test["n_claims"].sum())
+    total_expected = float(mu[("glm", "test")].sum())
+    print(f"\n[Ist/Soll auf den Testdaten] gesamt {total_actual:.0f} gegen {total_expected:.1f}")
+    print(f"  außerhalb ±1,96/√Soll: {len(outside_1)} von {len(deviation)} Klassen {outside_1}")
+    print(f"  außerhalb ±1,96·√φ̂/√Soll: {len(outside_phi)} {outside_phi}")
+
+    columns = [["area", "veh_power", "veh_age", "driv_age", "bonus_malus", "bm_off_ladder",
+                "veh_gas"], ["veh_brand", "region"]]
+    path = plots.save(plots.plot_actual_vs_expected(tables, columns),
+                      args.figures_dir / "fremtpl2_actual_vs_expected.png")
+    print(f"\n  Grafik: {path}")
+
+    rel = pricing.relativities(glm)
+    results = {
+        "seed": args.seed,
+        "test_share": args.test_share,
+        "cleaning": vars(report),
+        "split": {"groups": int(groups.nunique()), "train": len(train), "test": len(test)},
+        "duplicates": duplicates,
+        "test_total": {"actual": total_actual, "expected": total_expected},
+        "outside_band": outside,
+        "reference": {f: str(level) for f, level in reference.items()},
+        "deviance": deviance,
+        "deviance_gain_test": gain,
+        "n_params": n_params,
+        "pearson_dispersion": phi,
+        "relativities": [
+            {"feature": f, "level": str(lvl), **{k: float(v) for k, v in row.items()}}
+            for (f, lvl), row in rel.iterrows()
+        ],
+        "actual_vs_expected": {
+            f: [{"level": str(lvl), **{k: float(v) for k, v in row.items()}}
+                for lvl, row in table.iterrows()]
+            for f, table in tables.items()
+        },
+    }
+    out = args.figures_dir.parent / "fremtpl2.json"
+    out.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"  Kennzahlen: {out}")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="nonlife", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -205,6 +314,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     p_run.add_argument("--data-dir", type=Path, default=Path("data"))
     p_run.add_argument("--figures-dir", type=Path, default=Path("reports/figures"))
     p_run.set_defaults(func=run)
+
+    p_fre = sub.add_parser("fremtpl2", help="Frequenz-GLM auf freMTPL2 (Extra 'fremtpl')")
+    p_fre.add_argument("--seed", type=int, default=42, help="Seed der Aufteilung")
+    p_fre.add_argument("--test-share", type=float, default=0.1, help="Anteil der Gruppen im Test")
+    p_fre.add_argument("--cache-dir", type=Path, default=Path("data/openml"))
+    p_fre.add_argument("--figures-dir", type=Path, default=Path("reports/figures"))
+    p_fre.set_defaults(func=run_fremtpl2)
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # Windows-Konsole: sonst cp1252, kein λ

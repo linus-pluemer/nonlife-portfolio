@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import matplotlib
@@ -129,4 +129,46 @@ def plot_relativities(
     ax.set_xlabel("Faktor relativ zur Referenzklasse", color=TEXT)
     ax.legend(frameon=False, fontsize=9, labelcolor=TEXT, loc="lower left",
               bbox_to_anchor=(0, 1.0), ncol=3, borderaxespad=0.3)
+    return fig
+
+
+def plot_actual_vs_expected(
+    tables: Mapping[str, pd.DataFrame], columns: Sequence[Sequence[str]], z: float = 1.96
+) -> Figure:
+    """Ist/Soll je Klasse, ein Feld je Merkmal, Merkmale in ``columns`` angeordnet.
+
+    ``tables`` im Format von :func:`nonlife.evaluation.actual_vs_expected`.
+    Die Balken reichen von Verhältnis − z/√Soll bis Verhältnis + z/√Soll:
+    Unter dem Modell ist Ist ungefähr Poisson mit Mittel Soll, das Verhältnis
+    streut also mit Standardabweichung 1/√Soll. Liegt die 1 außerhalb, ist
+    die Abweichung mehr als Zufall (bei φ = 1; mit Überdispersion breiter).
+    """
+    rows = [sum(len(tables[f]) for f in col) for col in columns]
+    fig = plt.figure(figsize=(9.5, 0.24 * max(rows) + 1.6), dpi=150, facecolor=SURFACE)
+    outer = fig.add_gridspec(1, len(columns), wspace=0.45)
+    lo = min(float((t["ratio"] - z / np.sqrt(t["expected"])).min()) for t in tables.values())
+    hi = max(float((t["ratio"] + z / np.sqrt(t["expected"])).max()) for t in tables.values())
+    for c, features in enumerate(columns):
+        inner = outer[c].subgridspec(
+            len(features), 1, height_ratios=[len(tables[f]) + 1.2 for f in features], hspace=0.3
+        )
+        for r, feature in enumerate(features):
+            table = tables[feature]
+            ax = fig.add_subplot(inner[r])
+            _style(ax)
+            y = np.arange(len(table))[::-1].astype(float)
+            ax.errorbar(table["ratio"], y, xerr=z / np.sqrt(table["expected"]), fmt="o",
+                        color=SERIES_1, markersize=4, capsize=2, linewidth=1.2)
+            ax.axvline(1.0, color=TEXT_MUTED, linewidth=0.8)
+            ax.set_yticks(y, [str(level) for level in table.index], fontsize=8)
+            ax.set_ylim(-0.7, len(table) - 0.3)
+            ax.set_xlim(lo - 0.05, hi + 0.05)
+            ax.grid(axis="x", color=GRID, linewidth=0.8)
+            ax.grid(axis="y", visible=False)
+            ax.set_title(feature, loc="left", fontsize=9, color=TEXT, pad=3)
+            if r < len(features) - 1:
+                ax.tick_params(axis="x", labelbottom=False)
+            else:
+                ax.set_xlabel(f"Ist / Soll (Testdaten), Balken ± {z:g}/√Soll", color=TEXT,
+                              fontsize=9)
     return fig
