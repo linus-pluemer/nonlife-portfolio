@@ -136,13 +136,18 @@ def clean_fremtpl2(
     Raises
     ------
     DataValidationError
-        bei fehlenden Spalten, doppelter IDpol oder Exposure ≤ 0.
+        bei fehlenden Spalten, fehlenden Werten, doppelter IDpol oder
+        Exposure ≤ 0.
     """
     required = {"freq": (freq, list(_RENAME)), "sev": (sev, ["IDpol", "ClaimAmount"])}
     for name, (frame, columns) in required.items():
         missing = [c for c in columns if c not in frame.columns]
         if missing:
             raise DataValidationError(f"freMTPL2 {name}: fehlende Spalten {missing}")
+        # vor jeder Umwandlung: astype(str) machte aus NaN still die Ausprägung "nan"
+        with_nan = [c for c in columns if frame[c].isna().any()]
+        if with_nan:
+            raise DataValidationError(f"freMTPL2 {name}: fehlende Werte in {with_nan}")
 
     policies = freq[list(_RENAME)].rename(columns=_RENAME)
     policies["policy_id"] = policies["policy_id"].astype(np.int64)
@@ -205,8 +210,22 @@ def clean_fremtpl2(
 
 
 def _cut(values: pd.Series, edges: list[float], labels: list[str]) -> pd.Series:
-    """Intervalle [a, b) mit lesbaren Namen, als geordnete Kategorie."""
-    return pd.cut(values, edges, right=False, labels=labels)
+    """Intervalle [a, b) mit lesbaren Namen, als geordnete Kategorie.
+
+    Raises
+    ------
+    DataValidationError
+        wenn ein Wert außerhalb von [edges[0], edges[-1]) liegt; ``pd.cut``
+        gäbe dafür still NaN zurück.
+    """
+    classes = pd.cut(values, edges, right=False, labels=labels)
+    outside = values[classes.isna()]
+    if len(outside):
+        raise DataValidationError(
+            f"{values.name}: {len(outside)} Werte außerhalb [{edges[0]}, {edges[-1]}), "
+            f"z. B. {sorted(outside.unique())[:5]}"
+        )
+    return classes
 
 
 def _numbered(values: pd.Series) -> pd.Series:

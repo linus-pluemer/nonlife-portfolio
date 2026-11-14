@@ -106,6 +106,17 @@ def test_missing_column_rejected(raw: tuple[pd.DataFrame, pd.DataFrame]) -> None
         clean_fremtpl2(freq.drop(columns="Region"), sev)
 
 
+@pytest.mark.parametrize(("table", "column"), [("freq", "Region"), ("sev", "ClaimAmount")])
+def test_missing_values_rejected(
+    raw: tuple[pd.DataFrame, pd.DataFrame], table: str, column: str
+) -> None:
+    freq, sev = raw
+    frame = freq if table == "freq" else sev
+    frame.loc[0, column] = None  # Text: sonst still "nan"; Zahl: sonst NaN im Schadenbetrag
+    with pytest.raises(DataValidationError, match=f"{table}: fehlende Werte in \\['{column}'\\]"):
+        clean_fremtpl2(freq, sev)
+
+
 # --- Tarifmerkmale -----------------------------------------------------------
 
 
@@ -132,6 +143,15 @@ def _features(**raw_values: list[object]) -> pd.DataFrame:
 )
 def test_class_boundaries(feature: str, values: list[object], classes: list[str]) -> None:
     assert _features(**{feature: values})[feature].astype(str).tolist() == classes
+
+
+@pytest.mark.parametrize(
+    ("feature", "value"), [("driv_age", 17), ("veh_power", 3), ("bonus_malus", 49)]
+)
+def test_value_below_lowest_class_rejected(feature: str, value: int) -> None:
+    # pd.cut gäbe still NaN zurück, die Police hätte keine Klasse
+    with pytest.raises(DataValidationError, match=f"{feature}: 1 Werte außerhalb"):
+        _features(**{feature: [value]})
 
 
 def test_off_ladder_marks_malus_values() -> None:
