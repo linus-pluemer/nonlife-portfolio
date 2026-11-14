@@ -302,7 +302,7 @@ def simulate_portfolio(
     exposure = np.where(rng.random(n) < params.full_year_share, 1.0, 1.0 - rng.random(n))
     policies = pd.DataFrame(
         {
-            "policy_id": np.arange(1, n + 1),
+            "policy_id": np.arange(n),
             "accident_year": np.repeat(years, n_policies),
             "exposure": exposure,
             **_draw_features(params, n, rng),
@@ -320,7 +320,7 @@ def simulate_portfolio(
     amount = rng.lognormal(mean=np.log(mean) - sigma2 / 2, sigma=np.sqrt(sigma2))
     claims = pd.DataFrame(
         {
-            "claim_id": np.arange(1, len(claim_policy) + 1),
+            "claim_id": np.arange(len(claim_policy)),
             "policy_id": policies["policy_id"].to_numpy()[claim_policy],
             "accident_year": policies["accident_year"].to_numpy()[claim_policy],
             "claim_amount": amount,
