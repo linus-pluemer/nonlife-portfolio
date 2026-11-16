@@ -228,8 +228,9 @@ def predict_frequency(
     """Erwartete Schadenanzahl μ̂_i = e_i · exp(x_i'β̂) je Zeile von ``data``.
 
     Die Designmatrix wird mit den Ausprägungen und Referenzen aus dem
-    Training gebaut, nicht aus ``data``. Sonst könnten auf Testdaten Spalten
-    fehlen oder in anderer Reihenfolge stehen.
+    Training gebaut, nicht aus ``data``. Sonst könnte sich auf Testdaten die
+    Referenz verschieben, wenn die Trainingsreferenz dort fehlt, und Spalten
+    könnten fehlen oder in anderer Reihenfolge stehen.
 
     Raises
     ------
