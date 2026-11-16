@@ -16,7 +16,10 @@ def rng() -> np.random.Generator:
 
 @pytest.fixture(scope="session")
 def raa_triangle() -> pd.DataFrame:
-    """RAA-Dreieck aus Mack (1993), kumuliert, Index Anfalljahr, Spalten 0..9."""
+    """RAA-Dreieck, kumuliert, Index Anfalljahr, Spalten 0..9.
+
+    Quelle: Reinsurance Association of America (1991); Standardbeispiel u. a. bei Mack (1994).
+    """
     cl = pytest.importorskip("chainladder")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

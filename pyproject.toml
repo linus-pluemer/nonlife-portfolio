@@ -24,6 +24,9 @@ dev = [
     "mypy>=1.10",
     "chainladder>=0.8",  # nur als Gegenprobe in Tests
 ]
+fremtpl = [
+    "scikit-learn>=1.4",  # nur fetch_openml zum Laden von freMTPL2
+]
 
 [project.scripts]
 nonlife = "nonlife.cli:main"
@@ -33,7 +36,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra -m 'not network'"
+markers = ["network: lädt echte Daten aus dem Netz (pytest -m network)"]
 filterwarnings = ["ignore::DeprecationWarning:chainladder.*"]
 
 [tool.ruff]
@@ -54,5 +58,6 @@ strict = true
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
-module = ["pandas.*", "scipy.*", "statsmodels.*", "matplotlib.*", "chainladder.*"]
+module = ["pandas.*", "scipy.*", "statsmodels.*", "matplotlib.*", "chainladder.*",
+          "sklearn.*"]
 ignore_missing_imports = true

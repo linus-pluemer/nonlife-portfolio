@@ -68,7 +68,18 @@ def severity_table(policies: pd.DataFrame, claims: pd.DataFrame) -> pd.DataFrame
     Spalten, die in beiden Tabellen stehen (etwa ``accident_year``), werden aus
     ``claims`` übernommen. ``validate`` stellt sicher, dass jede policy_id in
     ``policies`` eindeutig ist, sonst würden Schäden beim Merge verdoppelt.
+
+    Raises
+    ------
+    ValueError
+        wenn ein Schaden keine Police hat. Sonst bekäme er fehlende Merkmale,
+        und das GLM würde abbrechen oder ihn still der Referenzklasse
+        zuordnen. Bereinigen gehört in die Datenaufbereitung, nicht hierher.
     """
+    orphans = claims.loc[~claims["policy_id"].isin(policies["policy_id"]), "policy_id"]
+    if len(orphans) > 0:
+        shown = ", ".join(map(str, orphans.unique()[:5]))
+        raise ValueError(f"{len(orphans)} Schäden ohne Police, policy_id: {shown} …")
     shared = [c for c in policies.columns if c in claims.columns and c != "policy_id"]
     return claims.merge(
         policies.drop(columns=shared), on="policy_id", how="left", validate="many_to_one"
@@ -90,7 +101,6 @@ def _design_matrix(
     Ohne Angabe in ``reference`` ist die erste Ausprägung in sortierter
     Reihenfolge die Referenz.
     """
-    columns: dict[str, np.ndarray] = {"const": np.ones(len(data))}
     levels: dict[str, tuple[Hashable, ...]] = {}
     ref: dict[str, Hashable] = {}
     for feature in features:
@@ -98,10 +108,31 @@ def _design_matrix(
         ref[feature] = (reference or {}).get(feature, levels[feature][0])
         if ref[feature] not in levels[feature]:
             raise ValueError(f"{feature}: Referenz {ref[feature]!r} kommt in den Daten nicht vor")
-        for level in levels[feature]:
-            if level != ref[feature]:
+    return _encode(data, levels, ref), levels, ref
+
+
+def _encode(
+    data: pd.DataFrame,
+    levels: Mapping[str, tuple[Hashable, ...]],
+    reference: Mapping[str, Hashable],
+) -> pd.DataFrame:
+    """Designmatrix mit fest vorgegebenen Ausprägungen, etwa denen aus dem Training.
+
+    Raises
+    ------
+    ValueError
+        bei einer Ausprägung, die nicht in ``levels`` steht. Sie bekäme sonst
+        nur Nullen und würde still wie die Referenz behandelt.
+    """
+    columns: dict[str, np.ndarray] = {"const": np.ones(len(data))}
+    for feature, feature_levels in levels.items():
+        unknown = set(data[feature].unique()) - set(feature_levels)
+        if unknown:
+            raise ValueError(f"{feature}: unbekannte Ausprägungen {sorted(map(str, unknown))}")
+        for level in feature_levels:
+            if level != reference[feature]:
                 columns[_column(feature, level)] = (data[feature] == level).to_numpy(float)
-    return pd.DataFrame(columns, index=data.index), levels, ref
+    return pd.DataFrame(columns, index=data.index)
 
 
 def fit_frequency_glm(
@@ -171,6 +202,45 @@ def fit_severity_glm(
         data[amount], design, family=sm.families.Gamma(link=sm.families.links.Log())
     )
     return TariffModel(model.fit(scale="X2"), levels, ref)
+
+
+def largest_exposure_levels(
+    data: pd.DataFrame, features: Sequence[str], exposure: str = "exposure"
+) -> dict[str, Hashable]:
+    """Referenz je Merkmal: die Ausprägung mit der größten Exposure.
+
+    Die Wahl ändert die angepassten Werte nicht, nur die Parametrisierung.
+    Mit der volumenstärksten Referenz sind die Standardfehler der übrigen
+    Faktoren am kleinsten, weil jeder Faktor gegen die Referenz geschätzt wird.
+    """
+    return {
+        feature: data.groupby(feature, observed=True)[exposure].sum().idxmax()
+        for feature in features
+    }
+
+
+# --- Vorhersage --------------------------------------------------------------
+
+
+def predict_frequency(
+    model: TariffModel, data: pd.DataFrame, exposure: str = "exposure"
+) -> np.ndarray:
+    """Erwartete Schadenanzahl μ̂_i = e_i · exp(x_i'β̂) je Zeile von ``data``.
+
+    Die Designmatrix wird mit den Ausprägungen und Referenzen aus dem
+    Training gebaut, nicht aus ``data``. Sonst könnte sich auf Testdaten die
+    Referenz verschieben, wenn die Trainingsreferenz dort fehlt, und Spalten
+    könnten fehlen oder in anderer Reihenfolge stehen.
+
+    Raises
+    ------
+    ValueError
+        bei einer Ausprägung, die im Training nicht vorkam.
+    """
+    design = _encode(data, model.levels, model.reference)
+    beta = model.result.params[design.columns].to_numpy(float)
+    eta = design.to_numpy(float) @ beta
+    return np.asarray(data[exposure].to_numpy(float) * np.exp(eta))
 
 
 # --- Auswertung --------------------------------------------------------------

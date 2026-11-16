@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 import matplotlib
@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from matplotlib.ticker import NullLocator
 
 SERIES_1 = "#2a78d6"  # Schätzung / Simulation
 SERIES_2 = "#eb6834"  # Wahrheit / Theorie
@@ -129,4 +131,130 @@ def plot_relativities(
     ax.set_xlabel("Faktor relativ zur Referenzklasse", color=TEXT)
     ax.legend(frameon=False, fontsize=9, labelcolor=TEXT, loc="lower left",
               bbox_to_anchor=(0, 1.0), ncol=3, borderaxespad=0.3)
+    return fig
+
+
+def _feature_panels(
+    sizes: Mapping[str, int],
+    columns: Sequence[Sequence[str]],
+    draw: Callable[[Axes, str, np.ndarray], None],
+    xlabel: str,
+) -> tuple[Figure, list[Axes]]:
+    """Raster mit einem Feld je Merkmal, Merkmale spaltenweise wie in ``columns``.
+
+    ``sizes`` ist die Anzahl der Klassen je Merkmal; die Feldhöhe richtet sich
+    danach, damit jede Klasse gleich viel Platz bekommt. ``draw`` zeichnet ein
+    Feld und erhält die y-Positionen der Klassen (oberste Klasse oben).
+    """
+    rows = [sum(sizes[f] for f in col) for col in columns]
+    height = 0.24 * max(rows) + 1.8
+    fig = plt.figure(figsize=(9.5, height), dpi=150, facecolor=SURFACE)
+    # oben 0,5 Zoll für die Legende, unten 0,6 Zoll für die Achsenbeschriftung
+    outer = fig.add_gridspec(1, len(columns), wspace=0.45, top=1 - 0.5 / height,
+                             bottom=0.6 / height)
+    axes: list[Axes] = []
+    for c, features in enumerate(columns):
+        inner = outer[c].subgridspec(
+            len(features), 1, height_ratios=[sizes[f] + 1.2 for f in features], hspace=0.3
+        )
+        for r, feature in enumerate(features):
+            ax = fig.add_subplot(inner[r])
+            _style(ax)
+            y = np.arange(sizes[feature])[::-1].astype(float)
+            draw(ax, feature, y)
+            ax.set_ylim(-0.7, sizes[feature] - 0.3)
+            ax.grid(axis="x", color=GRID, linewidth=0.8)
+            ax.grid(axis="y", visible=False)
+            ax.set_title(feature, loc="left", fontsize=9, color=TEXT, pad=3)
+            if r < len(features) - 1:
+                ax.tick_params(axis="x", labelbottom=False)
+            else:
+                ax.set_xlabel(xlabel, color=TEXT, fontsize=9)
+            axes.append(ax)
+    return fig, axes
+
+
+def plot_actual_vs_expected(
+    tables: Mapping[str, pd.DataFrame], columns: Sequence[Sequence[str]], z: float = 1.96
+) -> Figure:
+    """Ist/Soll je Klasse, ein Feld je Merkmal, Merkmale in ``columns`` angeordnet.
+
+    ``tables`` im Format von :func:`nonlife.evaluation.actual_vs_expected`.
+    Der Strich bei 1 heißt Ist = Soll. Die Balken reichen von
+    Verhältnis − z/√Soll bis Verhältnis + z/√Soll: Unter dem Modell ist Ist
+    ungefähr Poisson mit Mittel Soll, das Verhältnis streut also mit
+    Standardabweichung 1/√Soll. Schneidet der Balken die 1 nicht, ist die
+    Abweichung mehr als Zufall (bei φ = 1; mit Überdispersion breiter).
+    """
+    lo = min(float((t["ratio"] - z / np.sqrt(t["expected"])).min()) for t in tables.values())
+    hi = max(float((t["ratio"] + z / np.sqrt(t["expected"])).max()) for t in tables.values())
+
+    def draw(ax: Axes, feature: str, y: np.ndarray) -> None:
+        table = tables[feature]
+        ax.axvline(1.0, color=SERIES_2, linewidth=1.2)
+        ax.errorbar(table["ratio"], y, xerr=z / np.sqrt(table["expected"]), fmt="o",
+                    color=SERIES_1, markersize=4, capsize=2, linewidth=1.2)
+        ax.set_yticks(y, [str(level) for level in table.index], fontsize=8)
+        ax.set_xlim(lo - 0.05, hi + 0.05)
+
+    fig, _ = _feature_panels({f: len(t) for f, t in tables.items()}, columns, draw, "Ist / Soll")
+    z_text = f"{z:g}".replace(".", ",")
+    fig.legend(
+        handles=[
+            Line2D([], [], color=SERIES_1, marker="o", markersize=4,
+                   label=f"Ist / Soll je Klasse (Testdaten), Balken ± {z_text}/√Soll"),
+            Line2D([], [], color=SERIES_2, linewidth=1.2, label="Ist = Soll (Vorhersage trifft)"),
+        ],
+        loc="upper left", bbox_to_anchor=(0.08, 1.0), ncol=2, frameon=False, fontsize=9,
+        labelcolor=TEXT,
+    )
+    return fig
+
+
+def plot_relativity_panels(
+    rel: pd.DataFrame,
+    columns: Sequence[Sequence[str]],
+    one_way: Mapping[tuple[str, str], float] | None = None,
+    confidence: float = 0.95,
+    interval_note: str = "",
+) -> Figure:
+    """Geschätzte Tariffaktoren je Klasse, ein Feld je Merkmal, logarithmische Achse.
+
+    ``rel`` im Format von :func:`nonlife.pricing.relativities`, Reihenfolge der
+    Zeilen je Merkmal = Reihenfolge von oben nach unten. Die Referenzklasse hat
+    den Faktor 1. Logarithmische Achse, weil Faktoren multiplikativ wirken:
+    0,5 und 2 sind gleich weit von 1 entfernt. Mit ``one_way`` wird je Klasse
+    zusätzlich die einfache Auswertung leicht versetzt gezeigt.
+    """
+    sizes = {f: len(rel.loc[f]) for f in dict.fromkeys(rel.index.get_level_values(0))}
+    values = [rel["lower"], rel["upper"]]
+    if one_way is not None:
+        values.append(pd.Series(list(one_way.values())))
+    lo = min(float(v.min()) for v in values) / 1.1
+    hi = max(float(v.max()) for v in values) * 1.1
+
+    def draw(ax: Axes, feature: str, y: np.ndarray) -> None:
+        part = rel.loc[feature]
+        ax.axvline(1.0, color=TEXT_MUTED, linewidth=0.8)
+        if one_way is not None:
+            ax.plot([one_way[(feature, str(lvl))] for lvl in part.index], y + 0.3, "s",
+                    color=SERIES_3, markersize=4, markeredgecolor=SURFACE)
+        err = np.vstack([part["factor"] - part["lower"], part["upper"] - part["factor"]])
+        ax.errorbar(part["factor"], y, xerr=err, fmt="o", color=SERIES_1, markersize=4,
+                    capsize=2, linewidth=1.2)
+        ax.set_yticks(y, [str(level) for level in part.index], fontsize=8)
+        ax.set_xscale("log")
+        ax.set_xlim(lo, hi)
+        ticks = [t for t in (0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8) if lo <= t <= hi]
+        ax.set_xticks(ticks, [f"{t:g}".replace(".", ",") for t in ticks])
+        ax.xaxis.set_minor_locator(NullLocator())
+
+    fig, _ = _feature_panels(sizes, columns, draw, "Faktor relativ zur Referenzklasse")
+    handles = [Line2D([], [], color=SERIES_1, marker="o", markersize=4,
+                      label=f"GLM mit {confidence * 100:.0f}-%-Konfidenzintervall{interval_note}")]
+    if one_way is not None:
+        handles.append(Line2D([], [], color=SERIES_3, marker="s", markersize=4, linestyle="",
+                              label="einfache Auswertung je Merkmal"))
+    fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.08, 1.0), ncol=2,
+               frameon=False, fontsize=9, labelcolor=TEXT)
     return fig
