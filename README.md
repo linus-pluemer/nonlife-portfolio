@@ -2,6 +2,20 @@
 
 Dieses Projekt modelliert die Schäden eines simulierten Kfz-Portfolios in drei Teilen: Gesamtschaden im kollektiven Modell, Reservierung mit Chain-Ladder und Tarifierung mit Poisson- und Gamma-GLM; jede Schätzung wird gegen die bekannten wahren Parameter der Simulation geprüft. Das Frequenz-GLM läuft zusätzlich auf dem echten französischen Portfolio freMTPL2 und wird dort auf Testdaten bewertet. Es richtet sich an Leserinnen und Leser aus Aktuariat und versicherungsnaher IT.
 
+## Inhalt
+
+- [Ergebnisse auf einen Blick](#ergebnisse-auf-einen-blick)
+  - [Gesamtschaden: Simulation gegen Theorie](#gesamtschaden-simulation-gegen-theorie)
+  - [Reserve: Chain-Ladder gegen wahre Reserve](#reserve-chain-ladder-gegen-wahre-reserve)
+  - [Tariffaktoren: GLM gegen wahre Faktoren](#tariffaktoren-glm-gegen-wahre-faktoren)
+  - [Frequenz auf echten Daten: freMTPL2](#frequenz-auf-echten-daten-fremtpl2)
+- [Methodik](#methodik)
+- [Daten](#daten)
+- [Installation und Reproduktion](#installation-und-reproduktion)
+- [Grenzen](#grenzen)
+- [Geplant](#geplant)
+- [Entstehung](#entstehung)
+
 ## Ergebnisse auf einen Blick
 
 Alle Zahlen und Grafiken stammen aus `nonlife run --seed 42` (Standardargumente: 10.000 Policen je Anfalljahr, Anfalljahre 2015–2024, Stichtag Ende 2024, 10.000 Monte-Carlo-Läufe). Der Lauf erzeugt 100.000 Policen, 7.192 Schäden und 39.426 Zahlungen. Die vollständigen Kennzahlen stehen in [`reports/results.json`](reports/results.json).
@@ -55,15 +69,13 @@ Die Devianz misst, wie weit die vorhergesagten von den tatsächlichen Schadenzah
 
 ![Ist gegen Soll je Klasse auf den Testdaten](reports/figures/fremtpl2_actual_vs_expected.png)
 
-Ist ist die tatsächliche Zahl der Schäden einer Klasse in den Testdaten, Soll die Vorhersage des GLM für dieselben Policen. Der Balken zeigt, wie weit das Verhältnis allein durch Zufall schwankt, wenn das Modell stimmt (±1,96/√Soll, also breit bei kleinen Klassen wie R43). Schneidet der Balken den Strich bei 1, ist die Abweichung mit Zufall vereinbar.
+Für jede Klasse (eine Ausprägung eines Merkmals, z. B. Region R43 oder Fahreralter 18–20) wird die tatsächliche Zahl der Schäden der Testpolicen (Ist) mit der Zahl verglichen, die das GLM für genau diese Policen erwartet (Soll, Summe der vorhergesagten $\hat\mu_i$). Liegt Ist/Soll nahe 1, trifft das Modell die Klasse. Der Balken zeigt, wie weit das Verhältnis allein durch Zufall schwankt, wenn das Modell stimmt (±1,96/√Soll, also breit bei kleinen Klassen wie R43). Schneidet der Balken den Strich bei 1, ist die Abweichung mit Zufall vereinbar.
 
 Insgesamt gab es auf den Testdaten 2.619 Schäden bei 2.618,0 vorhergesagten. Je Klasse schneiden 59 der 65 Balken den Strich, 6 nicht. Die Balken unterstellen aber reine Poisson-Streuung, und die Daten streuen stärker: Der Schätzer der Dispersion (Verhältnis von beobachteter zu Poisson-Varianz) ist $\hat\phi = 1{,}71$. Verbreitert man die Balken entsprechend um den Faktor $\sqrt{1{,}71} \approx 1{,}31$, bleibt nur die Region R23 (Ist 34, Soll 20,8) außerhalb. Bei 65 Klassen wären etwa drei zufällige Ausreißer zu erwarten.
 
 **Wie sehen die geschätzten Faktoren aus?**
 
 ![Geschätzte Frequenzfaktoren auf freMTPL2](reports/figures/fremtpl2_relativities.png)
-
-*So liest man die Grafik:* Blau ist der Faktor des GLM, mit dem die Frequenz einer Klasse gegenüber der Referenzklasse (Faktor 1, die Klasse mit der meisten Exposure) multipliziert wird, mit 95-%-Konfidenzintervall. Grün ist die einfache Auswertung je Merkmal, also die beobachtete Frequenz der Klasse geteilt durch die der Referenzklasse, ohne die übrigen Merkmale zu berücksichtigen. Die Achse ist logarithmisch, weil Faktoren multiplikativ wirken. Wahre Faktoren gibt es nicht; die Faktoren werden deshalb auf fachliche Plausibilität geprüft. Die Intervalle rechnen mit $\phi = 1$ und sind um den Faktor 1,31 zu schmal (siehe [Grenzen](#grenzen)).
 
 - **Bonus-Malus** ist das stärkste Merkmal: Die Frequenz steigt mit der Höhe bis zum Faktor 3,44 (91–100 gegen 50). Das selbst gebildete Merkmal `bm_off_ladder` (Wert liegt neben der Stufenleiter schadenfreier Jahre, also steckt ein früherer Schaden darin) trägt bei gleicher Höhe einen weiteren Faktor 2,19 [2,10; 2,29]. Die Klasse 101+ liegt nur scheinbar unter 91–100: Werte über 100 liegen immer neben der Leiter, zusammen also 3,23 · 2,19 ≈ 7,1.
 - **Fahreralter** zeigt die Konfundierung am deutlichsten: Einfach ausgewertet haben 18- bis 20-Jährige die 3,6-fache Frequenz, im GLM nur die 1,45-fache. Junge Fahrer haben zwangsläufig einen hohen Bonus-Malus, weil sie die Leiter noch nicht hinabsteigen konnten. Die einfache Auswertung schreibt dem Alter zu, was zum großen Teil der Bonus-Malus erklärt.
